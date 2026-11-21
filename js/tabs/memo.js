@@ -71,9 +71,9 @@
   const DROP_TAGS = {
     SCRIPT: 1, STYLE: 1, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1, APPLET: 1,
     LINK: 1, META: 1, BASE: 1, IMG: 1, PICTURE: 1, SVG: 1, MATH: 1, CANVAS: 1,
-    FORM: 1, INPUT: 1, BUTTON: 1, TEXTAREA: 1, SELECT: 1, OPTION: 1, LABEL: 1,
+    INPUT: 1, BUTTON: 1, TEXTAREA: 1, SELECT: 1, OPTION: 1, DATALIST: 1,
     VIDEO: 1, AUDIO: 1, SOURCE: 1, TRACK: 1, TEMPLATE: 1, NOSCRIPT: 1, SLOT: 1,
-    A: 1, TABLE: 1, THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TD: 1, TH: 1
+    MAP: 1, AREA: 1, PORTAL: 1
   };
 
   function isColorValue(v) {
@@ -224,7 +224,9 @@
   function memoHTML(m) {
     const raw = m && typeof m.html === 'string' ? sanitizeHTML(m.html) : '';
     if (raw && htmlToText(raw).trim()) return raw;
-    return textToHTML(m && m.text);
+    const plain = String((m && m.text) || '');
+    if (!plain.replace(/\s+/g, '')) return '';   // 빈 메모는 빈 채로 (안내 문구 표시)
+    return textToHTML(plain);
   }
 
   /** 포스트잇 카드용: 태그는 살리고 문단은 줄바꿈으로, 글자 크기는 뺍니다. */
@@ -295,20 +297,23 @@
   // (저장할 때는 line-height 를 지우고, 화면에 그릴 때만 붙입니다)
   const SIZE_LINE_HEIGHT = { '12px': '26px', '18px': '25px', '22px': '21px' };
 
-  // 브라우저가 넣은 글자 크기(keyword)를 우리 px 크기로 바꿔 둡니다.
+  // 브라우저가 넣은 글자 크기(keyword)를 우리 px 크기로 바꿔 두고,
+  // 서식 지우기로 크기만 사라진 span 의 line-height 도 함께 정리합니다.
   function normalizeSizes(ed) {
     if (!ed) return;
     const nodes = ed.querySelectorAll('span[style],font');
     Array.prototype.forEach.call(nodes, function (n) {
       const cur = n.getAttribute('style') || '';
-      if (cur && !/font-size/i.test(cur)) return;
+      if (!cur) return;
       let next = filterStyle(cur);
       const m = /font-size:\s*([\d.]+px)/i.exec(next);
       if (m) {
         const lh = SIZE_LINE_HEIGHT[m[1].toLowerCase()] || '';
         if (lh) next += ';line-height:' + lh;
       }
-      if (next !== cur) n.setAttribute('style', next);
+      if (next === cur) return;
+      if (next) n.setAttribute('style', next);
+      else n.removeAttribute('style');
     });
   }
 
@@ -923,7 +928,8 @@
             });
           }
           setTimeout(function () {
-            placeCaret(el, isNew ? false : true);
+            if (isNew) placeCaret(el, false);
+            syncEmpty(el);
             syncBarFor(el);
           }, 180);
         }
