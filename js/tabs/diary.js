@@ -49,6 +49,42 @@
     }).slice(0, 6);
   }
 
+  function recentHTML() {
+    const rec = recent();
+    if (!rec.length) return '<div class="empty" style="padding:18px 10px">아직 쓴 일기가 없어요.</div>';
+    return '<div class="recent-list" id="recent-list">' + rec.map(function (r) {
+      return '<button type="button" class="recent-item" data-date="' + r.date + '">' +
+        '<span class="rmood">' + (r.mood || '📖') + '</span>' +
+        '<span class="rmain"><span class="rdate">' + UI.koDate(r.date) + '</span>' +
+          '<span class="rprev">' + UI.esc((r.title ? r.title + ' · ' : '') + (r.body || '').replace(/\s+/g, ' ').slice(0, 40)) + '</span>' +
+          mediaBadge(r) + '</span>' +
+      '</button>';
+    }).join('') + '</div>';
+  }
+
+  function bindRecent() {
+    if (!host) return;
+    host.querySelectorAll('#d-recent [data-date]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        flush();
+        selected = b.dataset.date;
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  // 저장할 때마다 '지난 일기' 목록과 개수만 새로 그립니다(입력 중인 글·커서는 그대로).
+  function refreshRecent() {
+    if (!host) return;
+    const box = host.querySelector('#d-recent');
+    if (!box) return;
+    box.innerHTML = recentHTML();
+    const count = host.querySelector('#d-count');
+    if (count) count.textContent = Store.all('diary').length + '편';
+    bindRecent();
+  }
+
   /* ---------- 첨부한 사진·동영상 ---------- */
   function kindOf(m) { return m && m.kind === 'video' ? 'video' : 'image'; }
 
@@ -276,7 +312,11 @@
   // 첨부 목록을 일기에 저장합니다(글이 없어도 사진만으로 일기가 만들어집니다).
   function persistMedia() {
     const entry = entryOf(selected);
-    if (entry) return Store.update('diary', entry.id, { media: mediaItems.slice() });
+    if (entry) {
+      const row = Store.update('diary', entry.id, { media: mediaItems.slice() });
+      refreshRecent();
+      return row;
+    }
     if (!mediaItems.length) return null;
     const titleEl = host && host.querySelector('#d-title');
     const bodyEl = host && host.querySelector('#d-body');
@@ -289,6 +329,7 @@
     });
     ensureDeleteButton();
     if (titleEl && bodyEl) setStatus('저장됨');
+    refreshRecent();
     return row;
   }
 
@@ -311,6 +352,7 @@
 
     if (window.MediaStore) MediaStore.del(id).catch(function () {});
     paintMedia();
+    refreshRecent();
     UI.toast('첨부를 지웠어요');
   }
 
@@ -581,7 +623,6 @@
       : [];
 
     const isToday = selected === UI.todayISO();
-    const rec = recent();
 
     host.innerHTML = '' +
       '<div class="diary-datebar">' +
@@ -614,17 +655,8 @@
         '</span>' +
       '</div>' +
 
-      '<div class="sec-head"><h2>지난 일기</h2><span class="sub">' + Store.all('diary').length + '편</span></div>' +
-      (rec.length
-        ? '<div class="recent-list" id="recent-list">' + rec.map(function (r) {
-            return '<button type="button" class="recent-item" data-date="' + r.date + '">' +
-              '<span class="rmood">' + (r.mood || '📖') + '</span>' +
-              '<span class="rmain"><span class="rdate">' + UI.koDate(r.date) + '</span>' +
-                '<span class="rprev">' + UI.esc((r.title ? r.title + ' · ' : '') + (r.body || '').replace(/\s+/g, ' ').slice(0, 40)) + '</span>' +
-                mediaBadge(r) + '</span>' +
-            '</button>';
-          }).join('') + '</div>'
-        : '<div class="empty" style="padding:18px 10px">아직 쓴 일기가 없어요.</div>') +
+      '<div class="sec-head"><h2>지난 일기</h2><span class="sub" id="d-count">' + Store.all('diary').length + '편</span></div>' +
+      '<div id="d-recent">' + recentHTML() + '</div>' +
       '<div style="height:8px"></div>';
 
     if (window.App && App.setSubtitle) {
@@ -692,14 +724,7 @@
     const del = host.querySelector('#d-del');
     if (del) del.addEventListener('click', askDelete);
 
-    host.querySelectorAll('#recent-list [data-date]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        flush();
-        selected = b.dataset.date;
-        render();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    });
+    bindRecent();
   }
 
   // 날짜를 옮기기 전에 쓰던 내용을 먼저 저장
@@ -785,6 +810,7 @@
     if (window.App && App.setSubtitle) {
       App.setSubtitle(UI.koDateFull(selected));
     }
+    refreshRecent();
     return true;
   }
 
