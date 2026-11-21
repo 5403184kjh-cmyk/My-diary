@@ -1492,3 +1492,221 @@ html.lb-open{overflow:hidden;}
 .counts-grid{grid-template-columns:repeat(7,1fr);}
 .count-cell b{font-size:15px;}
 .count-cell span{font-size:9px;letter-spacing:-.02em;}
+
+/* =========================================================
+   20. 달력 막대(칩) 보기 · 검색 · 일기 잠금  (v1.2)
+   ========================================================= */
+
+/* 보기 방식: 막대(▤) / 점(•••) */
+.cal-view-seg{
+  display:flex;gap:1px;padding:2px;margin-right:5px;
+  border-radius:9px;background:var(--bg-soft);
+}
+.cal-view-seg button{
+  width:28px;height:24px;border-radius:7px;
+  display:grid;place-items:center;
+  font-size:9.5px;font-weight:800;line-height:1;color:#A2968A;letter-spacing:-.05em;
+}
+.cal-view-seg button.is-on{background:#fff;color:var(--ink);box-shadow:var(--shadow-soft);}
+
+/* 날짜 칸 안의 일정 막대 */
+.cal-cell.with-chips{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  height:auto;
+  min-height:70px;
+  padding:3px 2px 4px;
+  border-radius:12px;
+  text-align:center;
+  overflow:hidden;
+}
+.cal-cell.with-chips .num{
+  width:20px;height:20px;flex:none;margin:0 auto 2px;
+  font-size:11.5px;font-weight:700;line-height:20px;
+}
+.cal-cell.with-chips .chips{display:block;text-align:left;}
+.cal-chip{
+  display:block;margin:0 0 2px;padding:1px 3px;
+  border-radius:4px;
+  background:var(--cb);color:var(--cf);
+  font-size:9px;line-height:12px;font-weight:700;letter-spacing:-.03em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cal-chip.is-done{opacity:.55;text-decoration:line-through;}
+.cal-more{
+  display:block;margin-top:1px;padding-left:3px;
+  font-size:8.5px;font-weight:800;color:var(--muted);
+}
+.cal-cell.with-chips .note-dot{
+  display:block;width:4px;height:4px;margin:2px auto 0;
+  border-radius:50%;background:var(--sage);opacity:.85;
+}
+
+/* 일정 목록 왼쪽 색 띠 */
+.task{position:relative;}
+.task.has-accent{padding-left:15px;overflow:hidden;}
+.task-accent{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cb);}
+
+.day-head.is-flash h2{animation:hdFlash 1.7s ease-out;}
+@keyframes hdFlash{0%,45%{color:var(--terra);}100%{color:var(--ink);}}
+
+/* 색 고르기(일정 수정 시트) */
+.color-pick{display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
+.cp-dot{
+  width:26px;height:26px;border-radius:50%;
+  background:var(--cb);border:2px solid transparent;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.62);
+}
+.cp-dot.is-on{border-color:var(--ink);}
+.cp-auto{
+  height:26px;padding:0 10px;border-radius:13px;
+  font-size:11px;font-weight:800;background:var(--cb);color:var(--cf);
+  border:2px solid transparent;
+}
+.cp-auto.is-on{border-color:var(--ink);}
+
+/* 검색 */
+.searchbar{
+  display:flex;align-items:center;gap:8px;
+  height:44px;margin:0 0 12px;padding:0 12px;
+  background:#fff;border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow-soft);
+}
+.searchbar:focus-within{border-color:var(--terra);box-shadow:0 0 0 3px rgba(193,104,74,.10);}
+.searchbar input{
+  flex:1;min-width:0;border:0;background:none;
+  font-size:14px;color:var(--ink);
+}
+.searchbar input::placeholder{color:#B5AA9C;font-size:12.5px;}
+.searchbar input:focus{outline:none;}
+.sb-icon{flex:none;width:17px;height:17px;display:grid;place-items:center;color:var(--muted);}
+.sb-icon svg{width:17px;height:17px;}
+.sb-clear[hidden]{display:none;}
+.sb-clear{
+  flex:none;width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--bg-soft);color:var(--ink-soft);
+  font-size:11px;font-weight:800;
+}
+.search-panel{margin:0 0 14px;}
+.search-meta{display:flex;align-items:center;gap:6px;margin:0 4px 8px;font-size:11.5px;color:var(--muted);}
+.search-meta b{color:var(--terra-dark);}
+.search-meta .n{font-weight:800;color:var(--ink-soft);}
+.search-locked{
+  margin:0 0 10px;padding:9px 11px;border-radius:11px;
+  background:var(--gold-soft);color:#846527;font-size:11.5px;line-height:1.45;
+}
+.search-empty{
+  padding:26px 12px;text-align:center;
+  font-size:12.5px;line-height:1.6;color:var(--muted);
+  background:#fff;border:1px dashed var(--line);border-radius:16px;
+}
+.sr-date{display:flex;align-items:baseline;gap:7px;margin:14px 4px 6px;font-size:11.5px;font-weight:800;color:var(--ink-soft);}
+.sr-date span{font-size:10px;font-weight:700;color:#B3A695;}
+.sr-row{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:10px 11px;margin-bottom:6px;text-align:left;
+  background:#fff;border:1px solid var(--line-soft);border-radius:13px;
+  box-shadow:var(--shadow-soft);
+}
+.sr-row:active{background:#FDFAF6;}
+.sr-bar{flex:none;align-self:stretch;width:4px;border-radius:3px;background:var(--cb);}
+.sr-ico{flex:none;width:18px;text-align:center;font-size:13px;}
+.sr-main{flex:1;min-width:0;}
+.sr-title{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:13px;line-height:1.42;color:var(--ink);word-break:break-word;
+}
+.sr-title mark{background:#FBEBC4;color:inherit;border-radius:3px;padding:0 1px;}
+.sr-meta{display:block;margin-top:3px;font-size:10.5px;font-weight:700;color:var(--muted);}
+.sr-go{flex:none;font-size:16px;color:#CFC5B8;}
+.is-searching .sched-main{display:none;}
+.memo-full{font-size:14px;line-height:1.65;color:var(--ink);white-space:pre-wrap;}
+
+/* 일기 잠금 화면 */
+.lock-screen{display:flex;flex-direction:column;align-items:center;padding:24px 8px 6px;text-align:center;}
+.lock-badge{
+  width:62px;height:62px;border-radius:50%;margin-bottom:12px;
+  display:grid;place-items:center;font-size:27px;
+  background:var(--terra-soft);
+}
+.lock-title{font-size:17px;font-weight:800;letter-spacing:-.02em;}
+.lock-msg{margin-top:6px;min-height:19px;font-size:12.5px;line-height:1.45;color:var(--muted);}
+.lock-msg.is-bad{color:var(--danger);font-weight:700;}
+.pin-dots{display:flex;gap:12px;margin:16px 0 14px;}
+.pin-dots i{
+  width:13px;height:13px;border-radius:50%;
+  border:1.5px solid #D8CEC0;background:#fff;
+  transition:background .12s,border-color .12s;
+}
+.pin-dots i.is-on{background:var(--terra);border-color:var(--terra);}
+.pin-dots.shake{animation:pinShake .32s;}
+@keyframes pinShake{
+  0%,100%{transform:translateX(0);}
+  25%{transform:translateX(-6px);}
+  50%{transform:translateX(6px);}
+  75%{transform:translateX(-3px);}
+}
+.btn-finger{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  height:44px;margin-bottom:14px;padding:0 18px;
+  background:#fff;border:1.5px solid var(--line);border-radius:14px;
+  font-size:13.5px;font-weight:800;color:var(--ink);
+  box-shadow:var(--shadow-soft);
+}
+.btn-finger:disabled{opacity:.6;}
+.btn-finger[hidden]{display:none;}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(100%,268px);}
+.key{
+  height:56px;border-radius:18px;
+  background:#fff;border:1px solid var(--line-soft);
+  box-shadow:var(--shadow-soft);
+  font-size:21px;font-weight:700;color:var(--ink);
+}
+.key:active{background:var(--bg-soft);transform:scale(.97);}
+.key-blank{background:none;border:0;box-shadow:none;pointer-events:none;}
+.key-del{font-size:17px;color:var(--ink-soft);}
+.lock-foot{margin-top:16px;font-size:11px;line-height:1.6;color:var(--muted);}
+.lock-now{font-size:13px;padding:0 9px;}
+
+/* 설정: 잠금 항목 */
+.pin-toggle.mini{width:auto;flex:none;padding:0;border:0;background:none;}
+.set-row.is-disabled{opacity:.62;}
+.set-row.lock-row{background:none;border-bottom:1px solid var(--line-soft);}
+.lock-note{margin-top:-2px;}
+.pin-input{letter-spacing:.5em;font-size:19px;text-align:center;font-weight:800;}
+
+/* 넓은 화면(태블릿·폴드)에서는 막대를 조금 더 크게 */
+@media (min-width:600px){
+  .cal-chip{font-size:9.5px;line-height:13.5px;padding:1px 3px;}
+  .cal-cell.with-chips{min-height:78px;}
+}
+@media (min-width:768px){
+  /* 태블릿·폴드에서는 달력(일정 탭)을 넓게 써서 막대가 더 많이 보이게 합니다 */
+  body[data-tab="schedule"]{--app-max:820px;}
+  .cal{padding:16px 14px 12px;}
+  .cal-head{padding:0 2px 10px;}
+  .cal-cell.with-chips{min-height:100px;padding:4px 3px;}
+  .cal-cell.with-chips .num{width:22px;height:22px;font-size:12.5px;line-height:22px;margin-bottom:3px;}
+  .cal-chip{font-size:10.5px;line-height:15px;padding:2px 4px;margin-bottom:3px;border-radius:5px;}
+  .cal-more{font-size:10px;}
+  .searchbar{height:48px;}
+  .searchbar input{font-size:15px;}
+}
+
+/* 일기 화면의 잠그기 버튼 */
+.diary-datebar button.lock-now{
+  width:auto;min-width:38px;padding:0 9px;
+  font-size:14px;font-weight:800;
+  background:var(--bg-soft);
+}
+
+/* 좁은 폰에서는 막대가 조금 더 보이도록 여백을 줄입니다 */
+@media (max-width:430px){
+  .cal{padding:14px 7px 10px;}
+  .cal-cell.with-chips{padding:3px 0 4px;}
+  .cal-chip{padding:0 2px;font-size:8.6px;line-height:12.5px;letter-spacing:-.05em;}
+  .cal-more{padding-left:2px;font-size:8px;}
+}

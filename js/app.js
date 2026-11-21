@@ -74,6 +74,7 @@
       if (active !== 'settings' && ORDER.indexOf(active) >= 0) lastTab = active;
     }
     active = id;
+    document.body.dataset.tab = id;
     if (ORDER.indexOf(id) >= 0) {
       try { localStorage.setItem('myDiaryApp.tab', id); } catch (e) {}
     }
@@ -142,6 +143,7 @@
   /* ---------- 시작 ---------- */
   active = initialTab();
   if (active === 'settings') lastTab = 'schedule';
+  document.body.dataset.tab = active;
   buildTabbar();
   renderTopbar();
   hideFab();

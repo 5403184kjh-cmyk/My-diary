@@ -7,7 +7,7 @@ window.Store = (function () {
 
   const KEY = 'myDiaryApp.v1';
   const VERSION = 2;
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.2.0';
 
   // 컬렉션 정의: 이름 -> 데이터 키 / 표시 이름
   const COLLECTIONS = {
@@ -39,7 +39,9 @@ window.Store = (function () {
         createdAt: new Date().toISOString(),
         updatedAt: null,
         theme: Object.assign({}, THEME_DEFAULT),
-        cats: { general: { expense: [], income: [] }, invest: { expense: [], income: [] } }
+        cats: { general: { expense: [], income: [] }, invest: { expense: [], income: [] } },
+        // 일기 잠금: { enabled, hash, salt, webauthn: { id } | null, updatedAt }
+        diaryLock: { enabled: false, hash: '', salt: '', webauthn: null, updatedAt: null }
       }
     };
   }
@@ -96,6 +98,25 @@ window.Store = (function () {
         }
       });
     });
+
+    // 일기 잠금 설정 (예전 백업 파일에는 없으므로 기본값을 채웁니다)
+    const lock = out.settings.diaryLock;
+    if (!lock || typeof lock !== 'object') {
+      out.settings.diaryLock = { enabled: false, hash: '', salt: '', webauthn: null, updatedAt: null };
+    } else {
+      out.settings.diaryLock = {
+        enabled: !!lock.enabled,
+        hash: typeof lock.hash === 'string' ? lock.hash : '',
+        salt: typeof lock.salt === 'string' ? lock.salt : '',
+        webauthn: lock.webauthn && typeof lock.webauthn === 'object' ? Object.assign({}, lock.webauthn) : null,
+        updatedAt: lock.updatedAt || null
+      };
+      // 잠금을 켰는데 비밀번호가 없으면 잠글 수 없으니 꺼 둡니다.
+      if (out.settings.diaryLock.enabled && !out.settings.diaryLock.hash) {
+        out.settings.diaryLock.enabled = false;
+        out.settings.diaryLock.webauthn = null;
+      }
+    }
     return out;
   }
 
@@ -248,6 +269,81 @@ window.Store = (function () {
 
   function writtenPages() {
     return state.page.items.filter(function (x) { return String(x.body || '').trim() !== ''; }).length;
+  }
+
+  /* ---------- 일기 잠금 ---------- */
+  // 4자리 PIN을 바로 알아보기 어렵게 만들기만 하는 화면 잠금용 해시입니다.
+  // (저장된 일기 자체를 암호화하지는 않습니다.)
+  function hashPin(pin, salt) {
+    let s = String(salt) + '|' + String(pin) + '|' + String(salt);
+    let h1 = 0x811c9dc5 >>> 0;
+    let h2 = 0x9e3779b9 >>> 0;
+    for (let round = 0; round < 4000; round++) {
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i) + (round & 0xff);
+        h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+        h2 = (Math.imul(h2 + c, 2654435761) >>> 0);
+      }
+      h1 = (h1 ^ (h2 >>> 7)) >>> 0;
+      s = h1.toString(36) + h2.toString(36) + round.toString(36);
+    }
+    return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+  }
+
+  function diaryLock() {
+    if (!state.settings.diaryLock) {
+      state.settings.diaryLock = { enabled: false, hash: '', salt: '', webauthn: null, updatedAt: null };
+    }
+    return state.settings.diaryLock;
+  }
+
+  function lockReady() {
+    const l = diaryLock();
+    return !!(l.enabled && l.hash && l.salt);
+  }
+
+  function setDiaryPin(pin) {
+    const p = String(pin || '').replace(/[^0-9]/g, '');
+    if (!/^\d{4}$/.test(p)) return false;
+    const l = diaryLock();
+    l.salt = uid('s');
+    l.hash = hashPin(p, l.salt);
+    l.enabled = true;
+    l.updatedAt = new Date().toISOString();
+    save();
+    return true;
+  }
+
+  function checkDiaryPin(pin) {
+    const l = diaryLock();
+    if (!l.hash || !l.salt) return false;
+    const p = String(pin || '').replace(/[^0-9]/g, '');
+    if (!/^\d{4}$/.test(p)) return false;
+    return hashPin(p, l.salt) === l.hash;
+  }
+
+  function setDiaryLockEnabled(on) {
+    const l = diaryLock();
+    if (on && !l.hash) return false;
+    l.enabled = !!on;
+    if (!l.enabled) l.webauthn = null; // 잠금을 끄면 지문 등록도 함께 해제
+    l.updatedAt = new Date().toISOString();
+    save();
+    return true;
+  }
+
+  // 지문(생체인증) 등록 정보 — 자격증명 id만 저장합니다.
+  function setDiaryWebauthn(info) {
+    const l = diaryLock();
+    l.webauthn = info && info.id ? { id: String(info.id), addedAt: new Date().toISOString() } : null;
+    l.updatedAt = new Date().toISOString();
+    save();
+    return l.webauthn;
+  }
+
+  function clearDiaryLock() {
+    state.settings.diaryLock = { enabled: false, hash: '', salt: '', webauthn: null, updatedAt: new Date().toISOString() };
+    save();
   }
 
   /* ---------- 테마 ---------- */
@@ -562,6 +658,13 @@ window.Store = (function () {
     savePage: savePage,
     writtenPages: writtenPages,
     setTheme: setTheme,
+    diaryLock: diaryLock,
+    lockReady: lockReady,
+    setDiaryPin: setDiaryPin,
+    checkDiaryPin: checkDiaryPin,
+    setDiaryLockEnabled: setDiaryLockEnabled,
+    setDiaryWebauthn: setDiaryWebauthn,
+    clearDiaryLock: clearDiaryLock,
     customCats: customCats,
     addCustomCat: addCustomCat,
     THEME_DEFAULT: THEME_DEFAULT,

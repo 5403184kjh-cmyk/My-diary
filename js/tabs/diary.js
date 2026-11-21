@@ -24,6 +24,9 @@
   let selected = UI.todayISO();
   let mood = '';
   let saveTimer = null;
+  let pinBuf = '';
+  let fpChecked = false;   // 이 화면에서 지문을 쓸 수 있는지 한 번만 확인
+  let fpUsable = false;
 
   function entryOf(date) {
     return Store.all('diary').find(function (x) { return x.date === date; }) || null;
@@ -35,8 +38,130 @@
     }).slice(0, 6);
   }
 
+  /* ---------- 잠금 화면 ---------- */
+  function lockScreenHTML() {
+    return '' +
+      '<div class="lock-screen">' +
+        '<div class="lock-badge" aria-hidden="true">🔒</div>' +
+        '<h2 class="lock-title">일기 잠금</h2>' +
+        '<p class="lock-msg" id="lock-msg">4자리 비밀번호를 눌러 주세요</p>' +
+        '<div class="pin-dots" id="pin-dots" aria-label="비밀번호 4자리">' +
+          '<i></i><i></i><i></i><i></i>' +
+        '</div>' +
+        '<button type="button" class="btn-finger" id="finger-btn" hidden>👆 지문으로 열기</button>' +
+        '<div class="keypad" id="keypad">' +
+          ['1','2','3','4','5','6','7','8','9'].map(function (n) {
+            return '<button type="button" class="key" data-key="' + n + '">' + n + '</button>';
+          }).join('') +
+          '<button type="button" class="key key-blank" data-key="blank" aria-hidden="true" tabindex="-1"></button>' +
+          '<button type="button" class="key" data-key="0">0</button>' +
+          '<button type="button" class="key key-del" data-key="del" aria-label="한 자리 지우기">⌫</button>' +
+        '</div>' +
+        '<p class="lock-foot">지문을 등록해 두면 지문으로도 열 수 있어요.<br>비밀번호를 잊으면 일기를 열 수 없으니 꼭 기억해 주세요.</p>' +
+      '</div>';
+  }
+
+  function paintDots() {
+    const dots = host && host.querySelectorAll('#pin-dots i');
+    if (!dots) return;
+    dots.forEach(function (d, i) { d.classList.toggle('is-on', i < pinBuf.length); });
+  }
+
+  function lockMsg(text, bad) {
+    const m = host && host.querySelector('#lock-msg');
+    if (!m) return;
+    m.textContent = text;
+    m.classList.toggle('is-bad', !!bad);
+  }
+
+  function shake() {
+    const box = host && host.querySelector('.pin-dots');
+    if (!box) return;
+    box.classList.remove('shake');
+    void box.offsetWidth;
+    box.classList.add('shake');
+  }
+
+  function renderLock() {
+    if (window.App && App.setSubtitle) App.setSubtitle('잠금 상태');
+    host.innerHTML = lockScreenHTML();
+    paintDots();
+
+    // 지문 버튼: 이 기기에서 쓸 수 있을 때만 보여 줍니다.
+    const fb = host.querySelector('#finger-btn');
+    if (fb && DiaryLock.hasFingerprint()) {
+      if (fpChecked) {
+        if (fpUsable) fb.hidden = false;
+      } else {
+        DiaryLock.platformAvailable().then(function (ok) {
+          fpChecked = true;
+          fpUsable = ok;
+          const b = host && host.querySelector('#finger-btn');
+          if (b) b.hidden = !ok;
+        });
+      }
+    }
+
+    host.querySelectorAll('#keypad [data-key]').forEach(function (b) {
+      b.addEventListener('click', function () { pressKey(b.dataset.key); });
+    });
+
+    if (fb) {
+      fb.addEventListener('click', function () {
+        fb.disabled = true;
+        DiaryLock.unlockWithFingerprint().then(function (r) {
+          const again = host && host.querySelector('#finger-btn');
+          if (again) again.disabled = false;
+          if (r.ok) {
+            pinBuf = '';
+            UI.toast('지문으로 열었어요');
+            render();
+          } else if (r.message) {
+            lockMsg(r.message, true);
+          }
+        });
+      });
+    }
+  }
+
+  function keyHandler(e) {
+    if (!host || !DiaryLock.isLocked() || (window.App && App.active !== 'diary')) return;
+    if (/^\d$/.test(e.key)) { pressKey(e.key); return; }
+    if (e.key === 'Backspace') { e.preventDefault(); pressKey('del'); }
+  }
+
+  function pressKey(k) {
+    if (k === 'blank') return;
+    if (k === 'del') {
+      pinBuf = pinBuf.slice(0, -1);
+      paintDots();
+      lockMsg('4자리 비밀번호를 눌러 주세요', false);
+      return;
+    }
+    if (pinBuf.length >= 4) return;
+    pinBuf += k;
+    paintDots();
+    if (pinBuf.length === 4) {
+      const pin = pinBuf;
+      setTimeout(function () {
+        if (Store.checkDiaryPin(pin)) {
+          pinBuf = '';
+          DiaryLock.unlock();
+          UI.toast('잠금을 풀었어요');
+          render();
+        } else {
+          pinBuf = '';
+          paintDots();
+          shake();
+          lockMsg('비밀번호가 맞지 않아요. 다시 눌러 주세요.', true);
+        }
+      }, 130);
+    }
+  }
+
   function render() {
     if (!host) return;
+    if (DiaryLock.isLocked()) { renderLock(); return; }
     const entry = entryOf(selected);
     mood = entry && entry.mood ? entry.mood : '';
 
@@ -50,6 +175,7 @@
           '<span>' + UI.parseISO(selected).getFullYear() + '년' + (isToday ? ' · <b class="today-dot">오늘</b>' : '') + '</span></div>' +
         '<button type="button" data-day="1" aria-label="다음 날">' + ICON.right + '</button>' +
         (isToday ? '' : '<button type="button" class="mini-btn" id="go-today" style="flex:none;height:34px">오늘</button>') +
+        (DiaryLock.enabled() ? '<button type="button" class="lock-now" id="lock-now" aria-label="일기 잠그기" title="일기 잠그기">🔒</button>' : '') +
       '</div>' +
 
       '<div class="mood-row" id="mood-row">' +
@@ -104,6 +230,18 @@
     const todayBtn = host.querySelector('#go-today');
     if (todayBtn) {
       todayBtn.addEventListener('click', function () { flush(); selected = UI.todayISO(); render(); });
+    }
+
+    const lockBtn = host.querySelector('#lock-now');
+    if (lockBtn) {
+      lockBtn.addEventListener('click', function () {
+        flush();
+        DiaryLock.lock();
+        pinBuf = '';
+        lockMsg('4자리 비밀번호를 눌러 주세요', false);
+        render();
+        UI.toast('일기를 잠갔어요');
+      });
     }
 
     host.querySelectorAll('#mood-row [data-mood]').forEach(function (b) {
@@ -233,9 +371,18 @@
     if (host && host.querySelector('#d-title') && host.querySelector('#d-body')) saveNow(true);
   }
 
+  document.addEventListener('keydown', keyHandler);
+
+  // 검색 결과에서 특정 날짜의 일기로 바로 이동할 때 씁니다.
+  function openDate(date) {
+    if (date) selected = String(date);
+  }
+
   T.diary = {
     id: 'diary',
     onLeave: onLeave,
+    openDate: openDate,
+    refresh: function () { if (host) render(); },
     label: '일기',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.8A2.6 2.6 0 0 1 6.8 3.2h12.4v14.2H6.8a2.6 2.6 0 0 0-2.6 2.6z"/><path d="M4.2 20a2.6 2.6 0 0 1 2.6-2.6h12.4V20z"/><path d="M8.4 7.6h7"/></svg>',
     title: '일기',
