@@ -12,6 +12,22 @@
 </style>
 </head>
 <body>
-  <iframe class="phone" id="phone" src="index.html?tab=diary" title="나의 다이어리 390x844 미리보기"></iframe>
+  <iframe class="phone" id="phone" title="나의 다이어리 390x844 미리보기" src="about:blank"></iframe>
+  <script>
+    // 검수용 임시 틀: 저장소(서비스워커 캐시)를 비운 뒤 새 화면을 불러옵니다.
+    (async function () {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        }
+      } catch (e) {}
+      document.getElementById('phone').src = 'index.html?tab=diary&v=6';
+    })();
+  </script>
 </body>
 </html>
