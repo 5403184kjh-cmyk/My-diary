@@ -8,7 +8,7 @@
 
   function countOf(payload) {
     const src = payload && payload.data ? payload.data : payload;
-    const out = { schedule: 0, finance: 0, card: 0, memo: 0, page: 0, diary: 0, dream: 0 };
+    const out = { schedule: 0, finance: 0, card: 0, memo: 0, page: 0, diary: 0, dream: 0, links: 0 };
     if (!src || typeof src !== 'object') return out;
     Object.keys(out).forEach(function (k) {
       const key = Store.COLLECTIONS[k].key;
@@ -295,14 +295,14 @@
 
   function askImport(payload) {
     const c = countOf(payload);
-    const total = c.schedule + c.finance + c.card + c.memo + c.page + c.diary + c.dream;
+    const total = c.schedule + c.finance + c.card + c.memo + c.page + c.diary + c.dream + c.links;
     if (!total) {
       UI.toast('백업 파일에 담긴 내용이 없어요');
       return;
     }
     UI.openDialog({
       title: '백업을 불러올까요?',
-      html: '이 파일에는 일정 <b>' + c.schedule + '</b> · 가계부 <b>' + c.finance + '</b> · 카드 <b>' + c.card + '</b> · 메모 <b>' + c.memo + '</b> · 다이어리 <b>' + c.page + '장</b> · 일기 <b>' + c.diary + '</b> · 꿈 <b>' + c.dream + '</b>개가 들어 있어요.<br><br>' +
+      html: '이 파일에는 일정 <b>' + c.schedule + '</b> · 가계부 <b>' + c.finance + '</b> · 카드 <b>' + c.card + '</b> · 메모 <b>' + c.memo + '</b> · 다이어리 <b>' + c.page + '장</b> · 일기 <b>' + c.diary + '</b> · 꿈 <b>' + c.dream + '</b> · 바로가기 <b>' + c.links + '</b>개가 들어 있어요.<br><br>' +
         '<b>합치기</b>는 지금 내용을 두고 겹치지 않는 것만 더해요.<br>' +
         '<b>덮어쓰기</b>는 지금 내용을 모두 지우고 파일 내용으로 바꿔요.',
       buttons: [
@@ -338,7 +338,7 @@
       '<div class="set-card">' +
         '<button type="button" class="set-row" id="btn-export">' +
           '<span class="sicon">⬇️</span><span class="stext"><span class="stitle">JSON으로 백업 내보내기</span>' +
-          '<span class="ssub">일정·가계부·카드·메모·다이어리·일기·꿈을 파일 하나로</span></span><span class="chev">›</span>' +
+          '<span class="ssub">일정·가계부·카드·메모·다이어리·일기·꿈·바로가기를 파일 하나로</span></span><span class="chev">›</span>' +
         '</button>' +
         '<button type="button" class="set-row" id="btn-import">' +
           '<span class="sicon">⬆️</span><span class="stext"><span class="stitle">백업 불러오기</span>' +
@@ -364,6 +364,7 @@
         '<div class="count-cell"><b>' + Store.writtenPages() + '</b><span>다이어리</span></div>' +
         '<div class="count-cell"><b>' + c.diary + '</b><span>일기</span></div>' +
         '<div class="count-cell"><b>' + c.dream + '</b><span>꿈</span></div>' +
+        '<div class="count-cell"><b>' + c.links + '</b><span>바로가기</span></div>' +
       '</div>' +
       '<div class="info-box" style="margin-top:10px">' +
         '저장 위치: 이 기기의 브라우저 저장소 (localStorage)<br>' +
@@ -384,7 +385,7 @@
       '<div class="sec-head"><h2>앱 정보</h2></div>' +
       '<div class="info-box">' +
         '<b>나의 다이어리</b> v' + Store.APP_VERSION + '<br>' +
-        '일정 · 가계부 · 메모 · 일기 · 꿈을 한곳에 모은 개인용 웹앱이에요.' +
+        '일정 · 가계부 · 카드 · 메모 · 다이어리 · 일기 · 꿈 · 바로가기를 한곳에 모은 개인용 웹앱이에요.' +
         '<div class="tiny">새 탭(예: 운동 기록, 카드 실적)은 js/tabs 폴더에 파일을 하나 더하면 붙일 수 있게 만들어 두었어요.</div>' +
       '</div>' +
       '<div class="app-foot">매일의 기록이 차곡차곡 쌓이기를 🌿</div>';
@@ -444,7 +445,7 @@
     host.querySelector('#btn-reset').addEventListener('click', function () {
       UI.confirmDialog({
         title: '모든 데이터를 지울까요?',
-        message: '일정 ' + Store.counts().schedule + '개, 가계부 ' + Store.counts().finance + '개, 카드 ' + Store.counts().card + '장, 메모 ' + Store.counts().memo + '개, 다이어리 ' + Store.writtenPages() + '장, 일기 ' + Store.counts().diary + '개, 꿈 ' + Store.counts().dream + '개가 모두 사라져요. 먼저 백업해 두는 것을 권해요.',
+        message: '일정 ' + Store.counts().schedule + '개, 가계부 ' + Store.counts().finance + '개, 카드 ' + Store.counts().card + '장, 메모 ' + Store.counts().memo + '개, 다이어리 ' + Store.writtenPages() + '장, 일기 ' + Store.counts().diary + '개, 꿈 ' + Store.counts().dream + '개, 바로가기 ' + Store.counts().links + '개가 모두 사라져요. 먼저 백업해 두는 것을 권해요.',
         confirmLabel: '모두 지우기',
         danger: true,
         onConfirm: function () {

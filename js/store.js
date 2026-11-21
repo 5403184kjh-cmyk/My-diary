@@ -7,7 +7,7 @@ window.Store = (function () {
 
   const KEY = 'myDiaryApp.v1';
   const VERSION = 2;
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.3.0';
 
   // 컬렉션 정의: 이름 -> 데이터 키 / 표시 이름
   const COLLECTIONS = {
@@ -17,7 +17,8 @@ window.Store = (function () {
     card: { key: 'items', label: '카드' },
     page: { key: 'items', label: '다이어리' },
     diary: { key: 'entries', label: '일기' },
-    dream: { key: 'items', label: '꿈' }
+    dream: { key: 'items', label: '꿈' },
+    links: { key: 'items', label: '바로가기' }
   };
 
   // 테마 기본값 (테마는 settings 안에 함께 저장돼 백업에도 들어갑니다)
@@ -34,6 +35,7 @@ window.Store = (function () {
       page: { items: [] },
       diary: { entries: [] },
       dream: { items: [] },
+      links: { items: [] },
       settings: {
         seeded: false,
         createdAt: new Date().toISOString(),
@@ -387,6 +389,7 @@ window.Store = (function () {
         page: state.page,
         diary: state.diary,
         dream: state.dream,
+        links: state.links,
         settings: state.settings
       }))
     };

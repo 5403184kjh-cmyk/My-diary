@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const ORDER = ['schedule', 'finance', 'card', 'memo', 'diary', 'dream'];
+  const ORDER = ['schedule', 'finance', 'card', 'memo', 'diary', 'dream', 'links'];
 
   const ICONS = {
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.2 13.4a7.6 7.6 0 0 0 0-2.8l1.7-1.3-1.9-3.3-2 .8a7.4 7.4 0 0 0-2.4-1.4L14.3 3h-3.8l-.3 2.4A7.4 7.4 0 0 0 7.8 6.8l-2-.8L3.9 9.3l1.7 1.3a7.6 7.6 0 0 0 0 2.8L3.9 14.7l1.9 3.3 2-.8a7.4 7.4 0 0 0 2.4 1.4l.3 2.4h3.8l.3-2.4a7.4 7.4 0 0 0 2.4-1.4l2 .8 1.9-3.3z"/></svg>',
