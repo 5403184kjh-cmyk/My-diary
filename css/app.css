@@ -1348,13 +1348,17 @@ textarea.input{min-height:120px;resize:vertical;line-height:1.5;}
 
 /* 메모 쓰기 시트의 서식 편집칸 */
 .memo-rich{
+  position:relative;
   min-height:132px;max-height:40vh;overflow-y:auto;
   font-size:14.5px;line-height:1.6;
   white-space:pre-wrap;word-break:break-word;
   -webkit-overflow-scrolling:touch;
 }
 .memo-rich > div,.memo-rich > p{margin:0;}
-.memo-rich[data-empty="1"]::before{content:attr(data-ph);color:#B5AA9C;pointer-events:none;}
+.memo-rich[data-empty="1"]::before{
+  content:attr(data-ph);color:#B5AA9C;pointer-events:none;
+  position:absolute;left:14px;top:12px;
+}
 .rt-bar + .memo-rich{margin-top:0;}
 
 .nb-slot{perspective:1000px;}
@@ -1371,7 +1375,7 @@ textarea.input{min-height:120px;resize:vertical;line-height:1.5;}
 .nb-page::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(90deg,var(--line) 0%,rgba(255,255,255,0) 100%);}
 .nb-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px 6px;font-size:9.5px;font-weight:800;letter-spacing:.14em;color:#BCB0A0;text-transform:uppercase;}
 .nb-lines{
-  display:block;
+  display:block;position:relative;
   flex:1;min-height:0;width:100%;
   border:0;outline:none;resize:none;background-color:transparent;
   font-family:inherit;font-size:14.5px;line-height:28px;color:#3F3931;
@@ -1385,7 +1389,10 @@ textarea.input{min-height:120px;resize:vertical;line-height:1.5;}
 /* 줄노트 배경(28px)에 글자가 맞도록 줄 높이는 그대로 두고 크기만 바뀝니다 */
 .nb-lines > div,.nb-lines > p{margin:0;min-height:28px;}
 .nb-lines b,.nb-lines strong{font-weight:800;}
-.nb-lines[data-empty="1"]::before{content:attr(data-ph);color:#C8BDAC;pointer-events:none;}
+.nb-lines[data-empty="1"]::before{
+  content:attr(data-ph);color:#C8BDAC;pointer-events:none;
+  position:absolute;left:2px;top:0;
+}
 .nb-foot{display:flex;justify-content:center;padding-top:6px;font-size:9.5px;letter-spacing:.2em;color:#C6BAA8;font-weight:700;}
 .nb-nav{display:flex;gap:8px;margin-top:12px;}
 .nb-nav button{

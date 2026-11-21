@@ -220,12 +220,15 @@
     }).join('');
   }
 
+  /** 빈 편집칸: 줄(div) 구조로 두어야 Enter 로 새 줄이 제대로 생깁니다. */
+  function emptyEditorHTML() { return '<div><br></div>'; }
+
   /** 메모 하나의 서식 HTML (예전 메모는 m.text 에서 안전하게 만들어 냅니다) */
   function memoHTML(m) {
     const raw = m && typeof m.html === 'string' ? sanitizeHTML(m.html) : '';
     if (raw && htmlToText(raw).trim()) return raw;
     const plain = String((m && m.text) || '');
-    if (!plain.replace(/\s+/g, '')) return '';   // 빈 메모는 빈 채로 (안내 문구 표시)
+    if (!plain.replace(/\s+/g, '')) return emptyEditorHTML();   // 빈 메모
     return textToHTML(plain);
   }
 
@@ -476,7 +479,8 @@
   function syncEmpty(ed) {
     if (!ed) return;
     const t = String(ed.textContent || '').replace(/[\u200B\uFEFF]/g, '').trim();
-    ed.setAttribute('data-empty', t ? '0' : '1');
+    const bare = ed.children.length <= 1;
+    ed.setAttribute('data-empty', (!t && bare) ? '1' : '0');
   }
 
   function bindRichInput(ed) {
@@ -497,11 +501,17 @@
   function placeCaret(ed, atEnd) {
     if (!ed) return;
     try { ed.focus({ preventScroll: true }); } catch (e) {}
-    const r = document.createRange();
-    r.selectNodeContents(ed);
-    r.collapse(!atEnd);
     const sel = window.getSelection();
     if (!sel) return;
+    const first = ed.firstElementChild;
+    const r = document.createRange();
+    if (!atEnd && first && /^(DIV|P)$/.test(first.tagName) && !htmlToText(first.innerHTML).trim()) {
+      r.setStart(first, 0);
+      r.collapse(true);
+    } else {
+      r.selectNodeContents(ed);
+      r.collapse(!atEnd);
+    }
     sel.removeAllRanges();
     sel.addRange(r);
     try { ed._rtRange = r.cloneRange(); } catch (e) {}
@@ -905,7 +915,7 @@
       onMount: function (form) {
         const el = form.querySelector('#memo-text');
         if (el) {
-          el.innerHTML = isNew ? '' : memoHTML(memo);
+          el.innerHTML = isNew ? emptyEditorHTML() : memoHTML(memo);
           normalizeSizes(el);
           syncEmpty(el);
           watchSelection();
