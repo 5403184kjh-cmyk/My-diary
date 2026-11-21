@@ -9,9 +9,15 @@
     font-family:-apple-system,BlinkMacSystemFont,'Noto Sans KR',system-ui,sans-serif;}
   .phone{width:390px;height:844px;border:0;border-radius:10px;background:#FAF7F2;
     box-shadow:0 24px 60px -24px rgba(60,40,20,.55);}
+  .tools{position:fixed;left:8px;top:8px;display:flex;gap:8px;align-items:center;font-size:12px;color:#5B5248;}
+  .tools button{height:28px;padding:0 10px;border-radius:8px;border:1px solid #C9BBA6;background:#fff;}
 </style>
 </head>
 <body>
+  <div class="tools">
+    <button type="button" id="fire-resize">resize 이벤트 보내기</button>
+    <span id="fired">0</span>
+  </div>
   <iframe class="phone" id="phone" title="나의 다이어리 390x844 미리보기" src="about:blank"></iframe>
   <script>
     // 검수용 임시 틀: 저장소(서비스워커 캐시)를 비운 뒤 새 화면을 불러옵니다.
@@ -28,6 +34,14 @@
       } catch (e) {}
       document.getElementById('phone').src = 'index.html?tab=diary&v=6';
     })();
+
+    // 키보드가 올라올 때 브라우저가 보내는 resize 이벤트를 대신 보내 봅니다.
+    document.getElementById('fire-resize').addEventListener('click', function () {
+      const w = document.getElementById('phone').contentWindow;
+      w.dispatchEvent(new Event('resize'));
+      window.__resizeFired = (window.__resizeFired || 0) + 1;
+      document.getElementById('fired').textContent = String(window.__resizeFired);
+    });
   </script>
 </body>
 </html>
