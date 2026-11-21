@@ -2,7 +2,7 @@
    sw.js — 오프라인에서도 열리도록 파일을 캐시합니다.
    파일을 수정했다면 CACHE 이름의 숫자를 올려 주세요.
    ========================================================= */
-const CACHE = 'my-diary-v3';
+const CACHE = 'my-diary-v4';
 const ASSETS = [
   './',
   './index.html',

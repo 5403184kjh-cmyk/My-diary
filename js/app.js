@@ -151,6 +151,18 @@
 
   /* ---------- 오프라인(PWA) ---------- */
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    // 이미 앱을 쓰던 중에 새 버전(sw.js)이 설치되면 화면도 새 파일로 한 번만 새로 고칩니다.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!hadController || reloading) return;
+      let done = '';
+      try { done = sessionStorage.getItem('myDiaryApp.swReload') || ''; } catch (e) {}
+      if (done) return;
+      reloading = true;
+      try { sessionStorage.setItem('myDiaryApp.swReload', '1'); } catch (e) {}
+      location.reload();
+    });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').catch(function () {});
     });
