@@ -1869,3 +1869,118 @@ html.lb-open{overflow:hidden;}
   .lk-grid{gap:16px 2px;}
   .lk-name{font-size:10.5px;}
 }
+
+/* =========================================================
+   22. 일기 사진·동영상 첨부
+   ========================================================= */
+.media-sec{
+  margin-top:8px;
+  padding-top:12px;
+  border-top:1px solid var(--line-soft);
+}
+.m-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+  margin:0 0 10px;
+}
+@media (min-width:520px){
+  .m-grid{grid-template-columns:repeat(4,1fr);}
+}
+.m-tile{
+  position:relative;
+  aspect-ratio:1/1;
+  border-radius:12px;
+  overflow:hidden;
+  background:var(--bg-soft);
+  border:1px solid var(--line-soft);
+  -webkit-tap-highlight-color:transparent;
+  cursor:pointer;
+}
+.m-tile .m-img,
+.m-tile .m-video{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+  background:#EFE6D8;
+}
+.m-tile .m-ph{
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  font-size:20px;
+  opacity:.55;
+}
+.m-tile.is-ready .m-ph{display:none;}
+.m-tile.is-broken::after{
+  content:"열 수 없음";
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  padding:4px;
+  font-size:9.5px;font-weight:800;color:var(--muted);
+  text-align:center;
+  background:var(--bg-soft);
+}
+.m-tile .m-play{
+  position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;
+  padding-left:2px;
+  background:rgba(24,18,12,.55);
+  color:#fff;font-size:11px;line-height:1;
+  box-shadow:0 3px 10px -4px rgba(0,0,0,.6);
+  pointer-events:none;
+}
+.m-tile .m-x{
+  position:absolute;top:3px;right:3px;
+  width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(255,255,255,.94);
+  color:#5B5248;
+  box-shadow:0 2px 6px -2px rgba(0,0,0,.35);
+  z-index:2;
+}
+.m-tile .m-x svg{width:11px;height:11px;}
+.m-tile .m-x:active{background:#fff;transform:scale(.92);}
+
+.m-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.m-add{
+  display:inline-flex;align-items:center;gap:6px;
+  height:40px;padding:0 13px;
+  border-radius:12px;
+  border:1.5px dashed #DFD2C0;
+  background:#FDFAF6;
+  color:var(--terra-dark);
+  font-size:13px;font-weight:800;letter-spacing:-.01em;
+}
+.m-add svg{width:17px;height:17px;}
+.m-add:active{background:var(--terra-soft);}
+.m-add:disabled{opacity:.6;}
+.m-add .m-count{
+  min-width:18px;height:18px;padding:0 5px;
+  border-radius:9px;
+  display:inline-grid;place-items:center;
+  background:var(--terra);color:#fff;
+  font-size:10px;font-weight:800;
+}
+.m-hint{font-size:10.5px;color:var(--muted);letter-spacing:-.01em;}
+.lb-missing{color:#EFE6D8;font-size:13px;font-weight:700;}
+
+/* 크게 보기: 동영상도 같은 틀에서 재생 */
+.lb-stage video{
+  max-width:100%;max-height:100%;
+  border-radius:10px;
+  background:#000;
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.8);
+}
+
+/* 지난 일기의 첨부 표시 */
+.recent-item .rprev{display:block;}
+.recent-item .rmedia{
+  display:block;
+  margin-top:3px;
+  font-size:10.5px;font-weight:800;
+  color:var(--terra-dark);
+  letter-spacing:-.01em;
+}

@@ -30,6 +30,7 @@
   let turning = false;
   let query = '';                 // 검색어
   let resizeTimer = null;
+  let lastWidth = window.innerWidth;  // 마지막으로 확인한 창 너비
 
   /* ---------- 달력 막대 색 ---------- */
   // 일정 제목에 자주 쓰는 낱말이 있으면 그 계열 색으로, 없으면 제목마다 늘 같은 색으로 보여 줍니다.
@@ -907,8 +908,16 @@
   }
 
   // 창 너비가 바뀌면(폰 가로/태블릿) 하루에 보이는 막대 수를 다시 셉니다.
+  // 주의: 폰에서 일기 입력칸을 누르면 키보드가 올라오며 resize가 오는데,
+  // 이때 다시 그리면 보고 있던 화면이 달력으로 덮여 버립니다.
+  // 그래서 (1) 일정 탭이 아닐 때는 아무 것도 하지 않고, (2) 실제로 너비가 바뀌었을 때만 다시 그립니다.
   window.addEventListener('resize', function () {
-    if (!host || mode !== 'calendar' || chipMode !== 'bar') return;
+    const width = window.innerWidth;
+    if (width === lastWidth) return;   // 높이만 바뀐 경우(키보드)는 넘어갑니다.
+    lastWidth = width;
+    if (!host) return;
+    if (window.App && App.active !== 'schedule') return;
+    if (mode !== 'calendar' || chipMode !== 'bar') return;
     if (document.activeElement && document.activeElement.id === 'sched-q') return;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () { render(); }, 220);

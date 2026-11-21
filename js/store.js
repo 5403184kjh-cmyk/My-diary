@@ -83,6 +83,23 @@ window.Store = (function () {
         .map(function (x) { return Object.assign({}, x); });
     });
 
+    /* 일기에 붙인 사진·동영상: 실제 파일(Blob)은 IndexedDB('myDiaryMedia')에 있고,
+       여기에는 가벼운 정보(id·종류·이름·형식·크기)만 남깁니다. */
+    out.diary.entries.forEach(function (row) {
+      const list = Array.isArray(row.media) ? row.media : [];
+      row.media = list.map(function (m) {
+        if (!m || !m.id) return null;
+        const size = Number(m.size);
+        return {
+          id: String(m.id),
+          kind: m.kind === 'video' ? 'video' : 'image',
+          name: typeof m.name === 'string' ? m.name.slice(0, 80) : '',
+          mime: typeof m.mime === 'string' ? m.mime.slice(0, 60) : '',
+          size: size > 0 ? Math.round(size) : 0
+        };
+      }).filter(function (m) { return !!m; });
+    });
+
     if (raw.settings && typeof raw.settings === 'object') {
       Object.assign(out.settings, raw.settings);
     }
@@ -247,10 +264,18 @@ window.Store = (function () {
   }
 
   function reset() {
+    // 일기에 붙인 사진·동영상도 함께 지웁니다(IndexedDB).
+    const mediaIds = [];
+    state.diary.entries.forEach(function (e) {
+      (Array.isArray(e.media) ? e.media : []).forEach(function (m) { if (m && m.id) mediaIds.push(m.id); });
+    });
     state = blank();
     state.settings.seeded = true; // 다시 샘플이 생기지 않도록
     save();
     notify();
+    if (mediaIds.length && window.MediaStore) {
+      window.MediaStore.delMany(mediaIds).catch(function () {});
+    }
   }
 
   /* ---------- 다이어리 한 장(날짜별 줄노트) ---------- */
