@@ -1324,7 +1324,7 @@ textarea.input{min-height:120px;resize:vertical;line-height:1.5;}
 }
 .rt-row{display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
 .rt-b{
-  flex:none;width:28px;height:27px;border-radius:7px;
+  flex:none;width:31px;height:29px;border-radius:7px;
   display:grid;place-items:center;line-height:1;
   background:#fff;border:1px solid var(--line);
   font-size:12.5px;font-weight:800;color:#4A4238;
@@ -1337,13 +1337,13 @@ textarea.input{min-height:120px;resize:vertical;line-height:1.5;}
 .rt-size{font-weight:800;letter-spacing:-.03em;color:#3F3931;}
 .rt-size.is-on{color:var(--terra-dark);}
 .rt-dot{
-  flex:none;width:22px;height:22px;border-radius:6px;
+  flex:none;width:26px;height:26px;border-radius:7px;
   border:1px solid rgba(120,95,60,.28);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.55);
 }
 .rt-dot.is-on{box-shadow:0 0 0 2px var(--terra),inset 0 0 0 1px rgba(255,255,255,.55);}
-.rt-off{width:24px;height:24px;font-size:11px;color:var(--muted);}
-.rt-lab{font-size:9px;font-weight:800;letter-spacing:.02em;color:var(--muted);margin-right:1px;}
+.rt-off{flex:none;width:26px;height:26px;font-size:11px;color:var(--muted);}
+.rt-lab{flex:none;white-space:nowrap;font-size:9.5px;font-weight:800;letter-spacing:.02em;color:var(--muted);margin-right:1px;}
 .rt-sep{flex:none;width:1px;height:16px;background:var(--line);margin:0 2px;}
 
 /* 메모 쓰기 시트의 서식 편집칸 */
