@@ -341,33 +341,36 @@
     });
   }
 
+  // 커서 위치의 글자 모양 읽기 (queryCommandState 는 Enter 처리 중 커서를 되돌려 버려 쓰지 않습니다)
+  function styleState(el) {
+    const out = { bold: false, underline: false, strike: false, size: 0, bg: '', fg: '' };
+    if (!el) return out;
+    try {
+      const st = window.getComputedStyle(el);
+      const weight = parseInt(st.fontWeight, 10) || 400;
+      const deco = String(st.textDecorationLine || st.textDecoration || '');
+      out.bold = weight >= 600;
+      out.underline = /underline/.test(deco);
+      out.strike = /line-through/.test(deco);
+      out.size = parseFloat(st.fontSize) || 0;
+      out.bg = st.backgroundColor || '';
+      out.fg = st.color || '';
+    } catch (e) {}
+    return out;
+  }
+
   function syncBarFor(ed) {
     const bar = ed && ed._rtBar;
     if (!bar) return;
-    let b = false, u = false, s = false;
-    try {
-      b = document.queryCommandState('bold');
-      u = document.queryCommandState('underline');
-      s = document.queryCommandState('strikeThrough');
-    } catch (e) {}
-    setBtnOn(bar, 'bold', b);
-    setBtnOn(bar, 'underline', u);
-    setBtnOn(bar, 'strike', s);
+    const stt = styleState(caretEl(ed));
+    setBtnOn(bar, 'bold', stt.bold);
+    setBtnOn(bar, 'underline', stt.underline);
+    setBtnOn(bar, 'strike', stt.strike);
 
-    let fs = 0, bg = '', fg = '';
-    const el = caretEl(ed);
-    if (el) {
-      try {
-        const st = window.getComputedStyle(el);
-        fs = parseFloat(st.fontSize) || 0;
-        bg = st.backgroundColor || '';
-        fg = st.color || '';
-      } catch (e) {}
-    }
     let bestId = '';
     let diff = 99;
     SIZES.forEach(function (z) {
-      const d = Math.abs(z.px - fs);
+      const d = Math.abs(z.px - stt.size);
       if (d < diff) { diff = d; bestId = z.id; }
     });
     if (diff > 2) bestId = '';
@@ -375,10 +378,10 @@
       x.classList.toggle('is-on', x.dataset.size === bestId);
     });
     bar.querySelectorAll('[data-rt="mark"]').forEach(function (x) {
-      x.classList.toggle('is-on', !!bg && bg === hexToRgb(x.dataset.hex));
+      x.classList.toggle('is-on', !!stt.bg && stt.bg === hexToRgb(x.dataset.hex));
     });
     bar.querySelectorAll('[data-rt="color"]').forEach(function (x) {
-      x.classList.toggle('is-on', !!fg && fg === hexToRgb(x.dataset.hex));
+      x.classList.toggle('is-on', !!stt.fg && stt.fg === hexToRgb(x.dataset.hex));
     });
   }
 
@@ -789,8 +792,8 @@
         scheduleSave(text, nbId);
       });
       text.addEventListener('blur', function () { flush(); });
-      text.addEventListener('keyup', function () { saveSel(text); syncBarFor(text); });
-      text.addEventListener('mouseup', function () { saveSel(text); syncBarFor(text); });
+      text.addEventListener('keyup', function () { saveSel(text); });
+      text.addEventListener('mouseup', function () { saveSel(text); });
     }
 
     host.querySelectorAll('[data-nav]').forEach(function (b) {
@@ -925,8 +928,8 @@
             syncEmpty(el);
             normalizeSizes(el);
           });
-          el.addEventListener('keyup', function () { saveSel(el); syncBarFor(el); });
-          el.addEventListener('mouseup', function () { saveSel(el); syncBarFor(el); });
+          el.addEventListener('keyup', function () { saveSel(el); });
+          el.addEventListener('mouseup', function () { saveSel(el); });
           // 시트를 아래로 끌어내리는 동작이 글쓰기·버튼 누르기와 겹치지 않게
           ['touchstart', 'touchmove'].forEach(function (ev) {
             el.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true });
