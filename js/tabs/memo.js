@@ -291,14 +291,23 @@
     try { ed._rtRange = r.cloneRange(); } catch (e) {}
   }
 
+  // 글자 크기별 줄 높이 — 줄노트의 28px 줄에 그대로 앉도록 맞춰 둡니다.
+  // (저장할 때는 line-height 를 지우고, 화면에 그릴 때만 붙입니다)
+  const SIZE_LINE_HEIGHT = { '12px': '26px', '18px': '25px', '22px': '21px' };
+
   // 브라우저가 넣은 글자 크기(keyword)를 우리 px 크기로 바꿔 둡니다.
   function normalizeSizes(ed) {
     if (!ed) return;
-    const nodes = ed.querySelectorAll('span[style],font[size],font[color]');
+    const nodes = ed.querySelectorAll('span[style],font');
     Array.prototype.forEach.call(nodes, function (n) {
       const cur = n.getAttribute('style') || '';
-      if (!/font-size/i.test(cur)) return;
-      const next = filterStyle(cur);
+      if (cur && !/font-size/i.test(cur)) return;
+      let next = filterStyle(cur);
+      const m = /font-size:\s*([\d.]+px)/i.exec(next);
+      if (m) {
+        const lh = SIZE_LINE_HEIGHT[m[1].toLowerCase()] || '';
+        if (lh) next += ';line-height:' + lh;
+      }
       if (next !== cur) n.setAttribute('style', next);
     });
   }
@@ -752,6 +761,7 @@
 
     const text = host.querySelector('#nb-text');
     if (text) {
+      normalizeSizes(text);
       syncEmpty(text);
       watchSelection();
       bindToolbar(host.querySelector('#rt-bar'), function () { return text; }, function () {
@@ -891,6 +901,7 @@
         const el = form.querySelector('#memo-text');
         if (el) {
           el.innerHTML = isNew ? '' : memoHTML(memo);
+          normalizeSizes(el);
           syncEmpty(el);
           watchSelection();
           bindToolbar(form.querySelector('#memo-rt'), function () { return el; });
