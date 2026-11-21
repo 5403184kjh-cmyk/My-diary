@@ -480,8 +480,8 @@ input,textarea,select{-webkit-appearance:none;appearance:none;}
 }
 .sg .k{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:-.01em;}
 .sg .v{font-size:14px;font-weight:800;margin-top:3px;letter-spacing:-.02em;color:var(--ink);}
-.sg .v.exp{color:var(--terra);}
-.sg .v.inc{color:var(--sage);}
+.sg .v.exp{color:var(--terra-dark);}
+.sg .v.inc{color:#1D6840;}
 .sg .v.inv{color:var(--gold);}
 
 .month-nav{display:flex;align-items:center;}
