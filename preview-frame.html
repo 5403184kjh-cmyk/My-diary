@@ -33,6 +33,17 @@
         }
       } catch (e) {}
       document.getElementById('phone').src = 'index.html?tab=diary&v=6';
+
+      // 안드로이드 크롬처럼 스크롤바가 보이지 않게(검수용 화면)
+      const phone = document.getElementById('phone');
+      phone.addEventListener('load', function () {
+        try {
+          const st = phone.contentDocument.createElement('style');
+          st.textContent = 'html,body{scrollbar-width:none;}' +
+            '::-webkit-scrollbar{width:0!important;height:0!important;display:none;}';
+          phone.contentDocument.head.appendChild(st);
+        } catch (e) {}
+      });
     })();
 
     // 키보드가 올라올 때 브라우저가 보내는 resize 이벤트를 대신 보내 봅니다.
