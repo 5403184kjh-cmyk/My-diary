@@ -8,13 +8,19 @@ window.Theme = (function () {
 
   // 프리셋: accent(포인트 색) + bg(종이 바탕색)
   const PRESETS = [
-    { id: 'terra',    label: '크림·테라코타', emoji: '🍂', accent: '#C1684A', bg: '#FAF7F2' },
-    { id: 'cherry',   label: '벚꽃 핑크',     emoji: '🌸', accent: '#D2718C', bg: '#FDF6F7' },
-    { id: 'basil',    label: '바질 그린',     emoji: '🌿', accent: '#6E9163', bg: '#F7FAF4' },
-    { id: 'lavender', label: '라벤더',        emoji: '💜', accent: '#8A79B8', bg: '#F8F6FC' },
-    { id: 'sky',      label: '스카이 블루',   emoji: '🌊', accent: '#4E8DBE', bg: '#F5F9FC' },
-    { id: 'sand',     label: '모래·골드',     emoji: '🌾', accent: '#B08A3E', bg: '#FBF7EC' }
+    { id: 'terra',    label: '크림·테라코타', emoji: '🍂', accent: '#C2461B', bg: '#FAF7F2' },
+    { id: 'cherry',   label: '벚꽃 핑크',     emoji: '🌸', accent: '#D0235B', bg: '#FDF5F7' },
+    { id: 'basil',    label: '바질 그린',     emoji: '🌿', accent: '#2E7D46', bg: '#F6FAF5' },
+    { id: 'lavender', label: '라벤더',        emoji: '💜', accent: '#6C46C8', bg: '#F8F6FC' },
+    { id: 'sky',      label: '스카이 블루',   emoji: '🌊', accent: '#1B6AB8', bg: '#F4F9FC' },
+    { id: 'sand',     label: '모래·골드',     emoji: '🌾', accent: '#8F6200', bg: '#FBF7EC' }
   ];
+
+  // 예전(옅은) 테마 색 — 저장된 값이 이것과 같으면 새 선명한 색으로 보여 줍니다.
+  const LEGACY_ACCENTS = {
+    terra: '#C1684A', cherry: '#D2718C', basil: '#6E9163',
+    lavender: '#8A79B8', sky: '#4E8DBE', sand: '#B08A3E'
+  };
 
   const DEFAULT_BG = '#FAF7F2';
 
@@ -96,12 +102,12 @@ window.Theme = (function () {
     const bg = bgHex || mix(accentHex, DEFAULT_BG, 0.94); // 직접 고른 색은 종이 바탕도 살짝 물들입니다
     return {
       accent: rgbToHex(a),
-      accentDark: hsl(h.h, clamp(h.s * 0.96, 18, 80), clamp(h.l - 9, 18, 70)),
-      accentSoft: hsl(h.h, clamp(h.s * 0.7, 14, 60), 92),
+      accentDark: hsl(h.h, clamp(h.s * 1.06, 45, 92), clamp(h.l - 11, 22, 70)),
+      accentSoft: hsl(h.h, clamp(h.s * 1.15, 50, 92), 90),
       bg: bg,
-      bgSoft: mix(bg, accentHex, 0.10),
-      line: mix(bg, accentHex, 0.17),
-      lineSoft: mix(bg, accentHex, 0.09)
+      bgSoft: mix(bg, accentHex, 0.11),
+      line: mix(bg, accentHex, 0.20),
+      lineSoft: mix(bg, accentHex, 0.10)
     };
   }
 
@@ -128,13 +134,21 @@ window.Theme = (function () {
     return PRESETS.find(function (x) { return x.id === id; }) || PRESETS[0];
   }
 
+  // 저장된 테마가 예전 옅은 색이면, 데이터는 그대로 두고 화면에만 선명한 색을 씁니다.
+  function fresh(t) {
+    const old = LEGACY_ACCENTS[t.preset];
+    if (!old || String(t.accent || '').toUpperCase() !== old.toUpperCase()) return t;
+    const p = presetOf(t.preset);
+    return { preset: p.id, accent: p.accent, bg: p.bg };
+  }
+
   function current() {
     const t = (Store.state.settings && Store.state.settings.theme) || {};
-    return {
+    return fresh({
       preset: t.preset || 'terra',
-      accent: t.accent || '#C1684A',
+      accent: t.accent || '#C2461B',
       bg: t.bg || '#FAF7F2'
-    };
+    });
   }
 
   function apply(theme) {

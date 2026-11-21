@@ -35,14 +35,14 @@
   /* ---------- 달력 막대 색 ---------- */
   // 일정 제목에 자주 쓰는 낱말이 있으면 그 계열 색으로, 없으면 제목마다 늘 같은 색으로 보여 줍니다.
   const PALETTE = {
-    rose:   { bg: '#F7DCE2', fg: '#8E3B51' },
-    coral:  { bg: '#FBDFD4', fg: '#9C4429' },
-    blue:   { bg: '#DCE7F6', fg: '#33547F' },
-    green:  { bg: '#E1ECD9', fg: '#42663C' },
-    purple: { bg: '#E8DEF4', fg: '#5A4184' },
-    teal:   { bg: '#D9EBE6', fg: '#2C6A62' },
-    gold:   { bg: '#F8ECCA', fg: '#8A621A' },
-    gray:   { bg: '#EDE6DA', fg: '#6B5F51' }
+    rose:   { bg: '#FEAAC1', fg: '#7A0522' },
+    coral:  { bg: '#FDC2AA', fg: '#7C2303' },
+    blue:   { bg: '#A7CBFB', fg: '#033277' },
+    green:  { bg: '#A3F0C0', fg: '#04672F' },
+    purple: { bg: '#D3B6F6', fg: '#3A0773' },
+    teal:   { bg: '#9FF4F3', fg: '#01656A' },
+    gold:   { bg: '#FDDE9B', fg: '#7A4B00' },
+    gray:   { bg: '#DDD6D0', fg: '#574533' }
   };
   const PALETTE_ORDER = ['rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray'];
   const COLOR_RULES = [

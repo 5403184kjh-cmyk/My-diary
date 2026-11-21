@@ -9,14 +9,14 @@
   const T = (window.Tabs = window.Tabs || {});
 
   const COLORS = [
-    { v: '#5B8DEF', label: '파랑' },
-    { v: '#3E9E8F', label: '청록' },
-    { v: '#7C9375', label: '세이지' },
-    { v: '#B98B2E', label: '골드' },
-    { v: '#C1684A', label: '테라' },
-    { v: '#D2688A', label: '로즈' },
-    { v: '#8A6FD1', label: '보라' },
-    { v: '#4B4B55', label: '차콜' }
+    { v: '#2F6FE0', label: '파랑' },
+    { v: '#0F9080', label: '청록' },
+    { v: '#2D7B4F', label: '세이지' },
+    { v: '#A06C00', label: '골드' },
+    { v: '#C2461B', label: '테라' },
+    { v: '#D62B60', label: '로즈' },
+    { v: '#7048C8', label: '보라' },
+    { v: '#3A3A45', label: '차콜' }
   ];
   const DEFAULT_COLOR = COLORS[0].v;
   const EMOJIS = [

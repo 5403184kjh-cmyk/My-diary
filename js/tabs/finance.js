@@ -37,7 +37,7 @@
   };
 
   // 원형 그래프 색 (밝고 선명하게)
-  const PIE_COLORS = ['#F0715F', '#F5A05A', '#F2C744', '#8FBF7A', '#6FA8C9', '#A48CC9', '#E08BA8', '#B9AE9E'];
+  const PIE_COLORS = ['#E0552F', '#C97D0A', '#AE8400', '#2E8B57', '#2276C4', '#7050C8', '#D23A75', '#857A6C'];
 
   let host = null;
   let ym = UI.ymOf(UI.todayISO());

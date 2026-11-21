@@ -22,7 +22,7 @@ window.Store = (function () {
   };
 
   // 테마 기본값 (테마는 settings 안에 함께 저장돼 백업에도 들어갑니다)
-  const THEME_DEFAULT = { preset: 'terra', accent: '#C1684A', bg: '#FAF7F2' };
+  const THEME_DEFAULT = { preset: 'terra', accent: '#C2461B', bg: '#FAF7F2' };
 
   function blank() {
     return {
