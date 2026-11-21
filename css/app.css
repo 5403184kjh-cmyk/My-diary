@@ -1751,6 +1751,8 @@ html.lb-open{overflow:hidden;}
   display:flex;flex-direction:column;align-items:center;
   width:100%;min-width:0;
   --lk-size:clamp(54px,16.5vw,68px);
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;touch-action:manipulation;
 }
 .lk-open{
   display:flex;flex-direction:column;align-items:center;gap:7px;
