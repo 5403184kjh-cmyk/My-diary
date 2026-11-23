@@ -2,26 +2,26 @@
    sw.js — 오프라인에서도 열리도록 파일을 캐시합니다.
    파일을 수정했다면 CACHE 이름의 숫자를 올려 주세요.
    ========================================================= */
-const CACHE = 'my-diary-v8';
+const CACHE = 'my-diary-v9';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/app.css',
-  './js/store.js',
-  './js/ui.js',
-  './js/theme.js',
-  './js/lock.js',
-  './js/media.js',
-  './js/tabs/schedule.js',
-  './js/tabs/finance.js',
-  './js/tabs/card.js',
-  './js/tabs/memo.js',
-  './js/tabs/diary.js',
-  './js/tabs/dream.js',
-  './js/tabs/links.js',
-  './js/tabs/settings.js',
-  './js/app.js',
+  './css/app.css?v=9',
+  './js/store.js?v=9',
+  './js/ui.js?v=9',
+  './js/theme.js?v=9',
+  './js/lock.js?v=9',
+  './js/media.js?v=9',
+  './js/tabs/schedule.js?v=9',
+  './js/tabs/finance.js?v=9',
+  './js/tabs/card.js?v=9',
+  './js/tabs/memo.js?v=9',
+  './js/tabs/diary.js?v=9',
+  './js/tabs/dream.js?v=9',
+  './js/tabs/links.js?v=9',
+  './js/tabs/settings.js?v=9',
+  './js/app.js?v=9',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-180.png'

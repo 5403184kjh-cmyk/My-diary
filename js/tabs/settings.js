@@ -8,7 +8,7 @@
 
   function countOf(payload) {
     const src = payload && payload.data ? payload.data : payload;
-    const out = { schedule: 0, finance: 0, card: 0, memo: 0, page: 0, diary: 0, dream: 0, links: 0 };
+    const out = { schedule: 0, finance: 0, card: 0, memo: 0, page: 0, diary: 0, dream: 0, links: 0, recurring: 0 };
     if (!src || typeof src !== 'object') return out;
     Object.keys(out).forEach(function (k) {
       const key = Store.COLLECTIONS[k].key;
@@ -16,6 +16,20 @@
       out[k] = Array.isArray(arr) ? arr.length : 0;
     });
     return out;
+  }
+
+  function catCountOf(payload) {
+    const src = payload && payload.data ? payload.data : payload;
+    const cl = src && src.settings && src.settings.catList;
+    if (!cl || typeof cl !== 'object') return 0;
+    let n = 0;
+    ['general', 'invest'].forEach(function (b) {
+      if (!cl[b]) return;
+      ['expense', 'income'].forEach(function (t) {
+        if (Array.isArray(cl[b][t])) n += cl[b][t].length;
+      });
+    });
+    return n;
   }
 
   /* ---------- 테마 ---------- */
@@ -295,14 +309,18 @@
 
   function askImport(payload) {
     const c = countOf(payload);
-    const total = c.schedule + c.finance + c.card + c.memo + c.page + c.diary + c.dream + c.links;
-    if (!total) {
+    const cats = catCountOf(payload);
+    const total = c.schedule + c.finance + c.card + c.memo + c.page + c.diary + c.dream + c.links + c.recurring;
+    if (!total && !cats) {
       UI.toast('백업 파일에 담긴 내용이 없어요');
       return;
     }
     UI.openDialog({
       title: '백업을 불러올까요?',
-      html: '이 파일에는 일정 <b>' + c.schedule + '</b> · 가계부 <b>' + c.finance + '</b> · 카드 <b>' + c.card + '</b> · 메모 <b>' + c.memo + '</b> · 다이어리 <b>' + c.page + '장</b> · 일기 <b>' + c.diary + '</b> · 꿈 <b>' + c.dream + '</b> · 바로가기 <b>' + c.links + '</b>개가 들어 있어요.<br><br>' +
+      html: '이 파일에 담긴 내용: 일정 <b>' + c.schedule + '</b> · 가계부 <b>' + c.finance + '</b> · 카드 <b>' + c.card + '</b> · 메모 <b>' + c.memo + '</b> · 다이어리 <b>' + c.page + '장</b> · 일기 <b>' + c.diary + '</b> · 꿈 <b>' + c.dream + '</b> · 바로가기 <b>' + c.links + '</b>' +
+        (c.recurring ? ' · 고정 수입/지출 <b>' + c.recurring + '</b>건' : '') +
+        (cats ? ' · 카테고리 <b>' + cats + '</b>개' : '') +
+        '<br><br>' +
         '<b>합치기</b>는 지금 내용을 두고 겹치지 않는 것만 더해요.<br>' +
         '<b>덮어쓰기</b>는 지금 내용을 모두 지우고 파일 내용으로 바꿔요.',
       buttons: [
@@ -338,7 +356,7 @@
       '<div class="set-card">' +
         '<button type="button" class="set-row" id="btn-export">' +
           '<span class="sicon">⬇️</span><span class="stext"><span class="stitle">JSON으로 백업 내보내기</span>' +
-          '<span class="ssub">일정·가계부·카드·메모·다이어리·일기·꿈·바로가기를 파일 하나로</span></span><span class="chev">›</span>' +
+          '<span class="ssub">일정·가계부·카드·메모·다이어리·일기·꿈·바로가기·고정 수입/지출을 파일 하나로</span></span><span class="chev">›</span>' +
         '</button>' +
         '<button type="button" class="set-row" id="btn-import">' +
           '<span class="sicon">⬆️</span><span class="stext"><span class="stitle">백업 불러오기</span>' +
@@ -369,6 +387,7 @@
       '<div class="info-box" style="margin-top:10px">' +
         '저장 위치: 이 기기의 브라우저 저장소 (localStorage)<br>' +
         '마지막 저장: ' + (saved ? UI.relTime(saved) : '아직 없음') + ' · ' + kb + ' KB' +
+        (c.recurring ? '<br>고정 수입/지출 ' + c.recurring + '건 · 카테고리 ' + (Store.catList('general', 'expense').length + Store.catList('general', 'income').length) + '개' : '') +
       '</div>' +
 
       '<div class="sec-head"><h2>홈 화면에 추가</h2><span class="sub">앱처럼 쓰기</span></div>' +

@@ -140,6 +140,12 @@
     }
   } catch (e) { console.warn(e); }
 
+  /* ---------- 고정 수입/지출: 이번 달 만든 날짜가 지난 건 자동 기록 ---------- */
+  try {
+    const n = Store.autoPostRecurring();
+    if (n > 0) console.info('고정 수입/지출 ' + n + '건을 이번 달 가계부에 기록했습니다.');
+  } catch (e) { console.warn(e); }
+
   /* ---------- 시작 ---------- */
   active = initialTab();
   if (active === 'settings') lastTab = 'schedule';

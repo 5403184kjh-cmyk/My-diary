@@ -20,21 +20,26 @@
   };
   const BOOK_ORDER = ['general', 'invest'];
 
-  const CATS = {
-    general: {
-      expense: ['식비', '장보기', '카페', '교통', '생활', '의료', '교육', '기타'],
-      income: ['급여', '부수입', '중고거래', '환급', '용돈', '기타']
-    },
-    invest: {
-      income: ['카드테크', '포인트&현금', '주식', '투자', '공모주', '이자/배당', '기타'],
-      expense: ['수수료', '세금', '손실', '기타']
-    }
-  };
-
   const TYPES = {
     income: { label: '수입', cls: 'inc', sign: 1 },
     expense: { label: '지출', cls: 'exp', sign: -1 }
   };
+
+  /* ---------- 카테고리 이름에서 그림(이모지)과 글자를 나눕니다 ---------- */
+  function catParts(label) {
+    const s = String(label == null ? '' : label).trim();
+    const m = s.match(/^([^\p{L}\p{N}]+)\s*(.*)$/u);
+    if (m && m[2]) return { icon: m[1].trim(), name: m[2].trim() };
+    return { icon: '', name: s };
+  }
+  function catIcon(label) {
+    const p = catParts(label);
+    return p.icon || (p.name ? p.name.slice(0, 1) : '·');
+  }
+  function catName(label) {
+    const p = catParts(label);
+    return p.name || String(label == null ? '' : label);
+  }
 
   // 원형 그래프 색 (밝고 선명하게)
   const PIE_COLORS = ['#E0552F', '#C97D0A', '#AE8400', '#2E8B57', '#2276C4', '#7050C8', '#D23A75', '#857A6C'];
@@ -117,6 +122,15 @@
       '</section>';
   }
 
+  function toolsHTML() {
+    if (book !== 'general') return '';
+    const n = Store.recurringRules().length;
+    return '<div class="fin-tools">' +
+      '<button type="button" class="mini-btn terra" id="btn-recurring">🔄 고정 수입/지출' + (n ? ' ' + n : '') + '</button>' +
+      '<button type="button" class="mini-btn" id="btn-cats">🗂 카테고리 관리</button>' +
+    '</div>';
+  }
+
   function viewSwitchHTML() {
     return '<div class="fin-views">' +
       '<button type="button" data-view="list" class="' + (view === 'list' ? 'is-on' : '') + '">내역</button>' +
@@ -133,13 +147,16 @@
 
   function rowHTML(item) {
     const t = TYPES[item.type] || TYPES.expense;
-    const cat = item.category || '기타';
+    const cat = item.category || '🧾 기타';
     return '' +
       '<button type="button" class="fin-row" data-id="' + item.id + '">' +
-        '<span class="cat-ic ' + t.cls + '">' + UI.esc(cat.slice(0, 1)) + '</span>' +
+        '<span class="cat-ic ' + t.cls + '">' + UI.esc(catIcon(cat)) + '</span>' +
         '<span class="fin-main">' +
-          '<span class="fin-cat">' + UI.esc(cat) + '<span class="type-badge ' + (item.type === 'income' ? 'inc-b' : 'exp-b') + '">' + t.label + '</span></span>' +
-          '<span class="fin-memo">' + UI.esc(item.memo || cat) + '</span>' +
+          '<span class="fin-cat">' + UI.esc(catName(cat)) +
+            '<span class="type-badge ' + (item.type === 'income' ? 'inc-b' : 'exp-b') + '">' + t.label + '</span>' +
+            (item.recurring ? '<span class="type-badge fix-b">고정</span>' : '') +
+          '</span>' +
+          '<span class="fin-memo">' + UI.esc(item.memo || catName(cat)) + '</span>' +
         '</span>' +
         '<span class="fin-amt ' + t.cls + '">' + amountText(item) + '</span>' +
       '</button>';
@@ -177,7 +194,7 @@
     });
     const total = Object.keys(map).reduce(function (a, k) { return a + map[k]; }, 0);
     return Object.keys(map).map(function (k) {
-      return { name: k, amount: map[k], pct: total ? (map[k] / total) * 100 : 0 };
+      return { name: catName(k), amount: map[k], pct: total ? (map[k] / total) * 100 : 0 };
     }).sort(function (a, b) { return b.amount - a.amount; });
   }
 
@@ -310,6 +327,8 @@
   /* ---------- 그리기 ---------- */
   function render() {
     if (!host) return;
+    // 이번 달 고정 수입/지출 중 아직 기록되지 않은 건을 먼저 반영합니다.
+    try { Store.autoPostRecurring(); } catch (e) { console.warn(e); }
     const all = bookItems();
     let list = all.slice();
     if (filter !== 'all') list = list.filter(function (x) { return x.type === filter; });
@@ -317,6 +336,7 @@
     host.innerHTML = '' +
       bookSwitchHTML() +
       summaryHTML(all) +
+      toolsHTML() +
       viewSwitchHTML() +
       (view === 'list' ? filtersHTML() + '<div id="fin-list">' + listHTML(list) + '</div>' : statsHTML(all));
 
@@ -372,13 +392,395 @@
         if (item) openEditor(item);
       });
     });
+    const reBtn = host.querySelector('#btn-recurring');
+    if (reBtn) reBtn.addEventListener('click', openRecurring);
+    const catBtn = host.querySelector('#btn-cats');
+    if (catBtn) catBtn.addEventListener('click', openCatManager);
+  }
+
+  /* ---------- 고정 수입/지출 ---------- */
+  function money(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+
+  function recRowHTML(r) {
+    const t = r.type === 'income' ? TYPES.income : TYPES.expense;
+    const on = r.active !== false;
+    return '<div class="rec-row' + (on ? '' : ' is-off') + '">' +
+      '<button type="button" class="rec-main" data-rec="' + UI.esc(r.id) + '">' +
+        '<span class="cat-ic ' + t.cls + '">' + UI.esc(catIcon(r.category)) + '</span>' +
+        '<span class="fin-main">' +
+          '<span class="fin-cat">' + UI.esc(r.name) + '</span>' +
+          '<span class="fin-memo">매월(' + r.day + '일) · ' + UI.esc(catName(r.category)) + ' · ' + UI.esc(r.method) + '</span>' +
+        '</span>' +
+        '<span class="fin-amt ' + t.cls + '">' + (r.type === 'income' ? '+' : '-') + money(r.amount) + '원</span>' +
+      '</button>' +
+      '<button type="button" class="rec-toggle' + (on ? ' is-on' : '') + '" data-rec-toggle="' + UI.esc(r.id) + '" aria-label="' + (on ? '중지' : '다시 켜기') + '">' + (on ? '켜짐' : '중지') + '</button>' +
+    '</div>';
+  }
+
+  function recurringListHTML() {
+    const rows = Store.recurringRules();
+    const t = Store.recurringTotals();
+    return '' +
+      '<div class="rec-total">매월' +
+        '<span>수입 <b class="inc">' + money(t.income) + '원</b></span>' +
+        '<span>지출 <b class="exp">' + money(t.expense) + '원</b></span>' +
+        '<span class="rec-cnt">' + rows.length + '건</span>' +
+      '</div>' +
+      '<button type="button" class="btn small block" id="rec-post">이번 달 미반영분 지금 반영</button>' +
+      (rows.length
+        ? '<div class="rec-list">' + rows.map(recRowHTML).join('') + '</div>'
+        : '<div class="empty" style="padding:28px 8px"><span class="emo">🔄</span>아직 고정 내역이 없어요.<br>월급·보험료·통신비처럼 매달 같은 내역을 넣어 두면<br>그 날짜에 맞춰 자동으로 기록돼요.</div>') +
+      '<div class="helper" style="margin-top:10px">고정 내역은 일반 가계부에만 기록되고, 이미 반영된 달은 다시 넣지 않아요. 항목을 눌러 고치거나 지울 수 있어요.</div>';
+  }
+
+  function drawRec() {
+    const wrap = document.getElementById('rec-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = recurringListHTML();
+    bindRecList(wrap);
+  }
+
+  function bindRecList(scope) {
+    scope.querySelectorAll('.rec-main').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const rule = Store.recurringRules().find(function (r) { return r.id === b.dataset.rec; });
+        if (rule) openRuleEditor(rule);
+      });
+    });
+    scope.querySelectorAll('[data-rec-toggle]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const row = Store.toggleRecurring(b.dataset.recToggle);
+        drawRec();
+        render();
+        if (row) UI.toast(row.active ? '다시 자동 기록해요' : '자동 기록을 멈췄어요');
+      });
+    });
+    const post = scope.querySelector('#rec-post');
+    if (post) {
+      post.addEventListener('click', function () {
+        const n = Store.autoPostRecurring();
+        drawRec();
+        render();
+        UI.toast(n ? n + '건을 이번 달 가계부에 반영했어요' : '이번 달은 이미 다 반영했어요');
+      });
+    }
+  }
+
+  function openRecurring() {
+    UI.openSheet({
+      title: '고정 수입/지출',
+      subtitle: '매달 정해진 날에 자동 기록',
+      body: '<div id="rec-wrap">' + recurringListHTML() + '</div>',
+      noFocus: true,
+      buttons: [
+        { label: '＋ 추가', kind: 'primary', keepOpen: true, onClick: function () { openRuleEditor(null); } },
+        { label: '닫기', kind: 'ghost' }
+      ],
+      onMount: function (form) { bindRecList(form); }
+    });
+  }
+
+  function openRuleEditor(rule) {
+    const isNew = !rule;
+    let type = isNew ? 'expense' : (rule.type || 'expense');
+    let cat = isNew ? '' : (rule.category || '');
+    let method = isNew ? '현금' : (rule.method || '현금');
+    let active = isNew ? true : (rule.active !== false);
+
+    function catChips(t, chosen) {
+      const list = Store.catList('general', t).slice();
+      if (chosen && list.indexOf(chosen) < 0) list.push(chosen);
+      if (!list.length) return '<div class="helper">카테고리가 없어요. 「카테고리 관리」에서 먼저 만들어 주세요.</div>';
+      return list.map(function (c) {
+        return '<button type="button" class="chip ' + (c === chosen ? 'is-on' : '') + '" data-rcat="' + UI.esc(c) + '">' + UI.esc(c) + '</button>';
+      }).join('');
+    }
+
+    function methodChips(chosen) {
+      const list = ['현금', '카드', '계좌이체', '휴대폰'];
+      if (chosen && list.indexOf(chosen) < 0) list.push(chosen);
+      return list.map(function (m) {
+        return '<button type="button" class="chip ' + (m === chosen ? 'is-on' : '') + '" data-rmethod="' + UI.esc(m) + '">' + UI.esc(m) + '</button>';
+      }).join('');
+    }
+
+    function bindCatChips(chips) {
+      if (!chips) return;
+      chips.querySelectorAll('[data-rcat]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          cat = b.dataset.rcat;
+          chips.querySelectorAll('[data-rcat]').forEach(function (x) {
+            x.classList.toggle('is-on', x.dataset.rcat === cat);
+          });
+        });
+      });
+    }
+
+    const body = '' +
+      '<div class="field"><label>항목명</label>' +
+        '<input class="input" id="rec-name" maxlength="40" autocomplete="off" placeholder="예: 휴대폰 요금" value="' + UI.esc(isNew ? '' : rule.name) + '">' +
+      '</div>' +
+      '<div class="field"><label>구분</label>' +
+        '<div class="seg seg-2" id="rec-type">' +
+          ['expense', 'income'].map(function (t) {
+            return '<button type="button" data-type="' + t + '" class="' + (t === type ? 'is-on' : '') + '">' + TYPES[t].label + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="field"><label>금액</label>' +
+        '<div class="amount-wrap">' +
+          '<input class="input amount-input" id="rec-amount" inputmode="numeric" autocomplete="off" value="' + (isNew ? '' : Number(rule.amount || 0).toLocaleString('ko-KR')) + '" aria-label="금액">' +
+          '<span class="amount-unit">원</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="field"><label>매월 며칠</label>' +
+        '<div class="rec-day-wrap">' +
+          '<input class="input" type="number" id="rec-day" min="1" max="31" inputmode="numeric" value="' + (isNew ? new Date().getDate() : rule.day) + '" aria-label="매월 며칠">' +
+          '<span class="rec-day-unit">일</span>' +
+        '</div>' +
+        '<div class="helper">31일처럼 없는 달은 그 달 마지막 날로 맞춰 기록해요.</div>' +
+      '</div>' +
+      '<div class="field"><span class="field-label">카테고리</span>' +
+        '<div class="chips" id="rec-cats">' + catChips(type, cat) + '</div>' +
+      '</div>' +
+      '<div class="field"><span class="field-label">결제수단</span>' +
+        '<div class="chips" id="rec-methods">' + methodChips(method) + '</div>' +
+      '</div>' +
+      '<div class="field"><span class="field-label">활성</span>' +
+        '<button type="button" class="pin-toggle mini' + (active ? ' is-on' : '') + '" id="rec-active" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" aria-label="활성">' +
+          '<span class="sw"></span><span id="rec-active-txt">' + (active ? '자동 기록 켜짐' : '자동 기록 멈춤') + '</span></button>' +
+      '</div>';
+
+    const buttons = [
+      { label: isNew ? '추가' : '저장', kind: 'primary', submit: true, keepOpen: true, onClick: function (form) {
+          const name = form.querySelector('#rec-name').value.trim();
+          const amount = UI.parseAmount(form.querySelector('#rec-amount').value);
+          const day = Math.round(Number(form.querySelector('#rec-day').value) || 1);
+          if (!name) { UI.toast('항목명을 적어 주세요'); return false; }
+          if (!amount) { UI.toast('금액을 적어 주세요'); return false; }
+          const data = {
+            name: name,
+            type: type,
+            amount: amount,
+            day: Math.min(31, Math.max(1, day)),
+            category: cat || (type === 'income' ? '기타수입' : '🧾 기타'),
+            method: method,
+            active: active
+          };
+          if (isNew) Store.addRecurring(data);
+          else Store.updateRecurring(rule.id, data);
+          UI.toast(isNew ? '고정 내역을 추가했어요' : '저장했어요');
+          render();
+          openRecurring();
+          return false;
+        } },
+      { label: '취소', kind: 'ghost', keepOpen: true, onClick: function () { openRecurring(); return false; } }
+    ];
+
+    if (!isNew) {
+      buttons.splice(1, 0, { label: '삭제', kind: 'danger', keepOpen: true, onClick: function () {
+        UI.confirmDialog({
+          title: '고정 내역을 지울까요?',
+          message: '“' + rule.name + '” 고정 내역을 지웁니다. 이미 기록된 가계부 내역은 그대로 남아요.',
+          confirmLabel: '삭제',
+          danger: true,
+          onConfirm: function () {
+            Store.removeRecurring(rule.id);
+            UI.toast('지웠어요');
+            render();
+            openRecurring();
+          }
+        });
+      } });
+    }
+
+    UI.openSheet({
+      title: isNew ? '고정 내역 추가' : '고정 내역 수정',
+      subtitle: '이 날짜에 맞춰 일반 가계부에 자동으로 기록해요',
+      body: body,
+      buttons: buttons,
+      noFocus: !isNew,
+      onMount: function (form) {
+        UI.bindAmount(form.querySelector('#rec-amount'));
+
+        form.querySelectorAll('#rec-type [data-type]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            type = b.dataset.type;
+            cat = '';
+            form.querySelectorAll('#rec-type [data-type]').forEach(function (x) {
+              x.classList.toggle('is-on', x.dataset.type === type);
+            });
+            const chips = form.querySelector('#rec-cats');
+            chips.innerHTML = catChips(type, '');
+            bindCatChips(chips);
+          });
+        });
+        bindCatChips(form.querySelector('#rec-cats'));
+
+        form.querySelectorAll('#rec-methods [data-rmethod]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            method = b.dataset.rmethod;
+            form.querySelectorAll('#rec-methods [data-rmethod]').forEach(function (x) {
+              x.classList.toggle('is-on', x.dataset.rmethod === method);
+            });
+          });
+        });
+
+        const act = form.querySelector('#rec-active');
+        if (act) {
+          act.addEventListener('click', function () {
+            active = !active;
+            act.classList.toggle('is-on', active);
+            act.setAttribute('aria-checked', active ? 'true' : 'false');
+            form.querySelector('#rec-active-txt').textContent = active ? '자동 기록 켜짐' : '자동 기록 멈춤';
+          });
+        }
+
+        const dayEl = form.querySelector('#rec-day');
+        if (dayEl) {
+          dayEl.addEventListener('input', function () {
+            const v = String(dayEl.value).replace(/[^0-9]/g, '').slice(0, 2);
+            if (dayEl.value !== v) dayEl.value = v;
+          });
+        }
+      }
+    });
+  }
+
+  /* ---------- 카테고리 관리 ---------- */
+  function openCatManager() {
+    let tab = 'expense';
+    let formEl = null;
+
+    function rowsHTML() {
+      const list = Store.catList('general', tab);
+      if (!list.length) return '<div class="helper">카테고리가 하나도 없어요. 아래에서 추가해 보세요.</div>';
+      return list.map(function (l) {
+        return '<div class="cat-man-row">' +
+          '<span class="cat-ic">' + UI.esc(catIcon(l)) + '</span>' +
+          '<input class="cat-man-input" data-old="' + UI.esc(l) + '" data-icon="' + UI.esc(catParts(l).icon) + '" value="' + UI.esc(catName(l)) + '" maxlength="24" aria-label="' + UI.esc(catName(l)) + '">' +
+          '<button type="button" class="cat-man-del" data-del="' + UI.esc(l) + '" aria-label="' + UI.esc(catName(l)) + ' 지우기">✕</button>' +
+        '</div>';
+      }).join('');
+    }
+
+    function draw() {
+      if (!formEl) return;
+      const listEl = formEl.querySelector('#cat-man-list');
+      if (!listEl) return;
+      listEl.innerHTML = rowsHTML();
+      bindList();
+    }
+
+    function rename(input) {
+      const from = input.dataset.old;
+      const typed = input.value.trim();
+      if (!typed) { input.value = catName(from); UI.toast('이름을 비울 수 없어요'); return; }
+      const p = catParts(typed);
+      const icon = p.icon || input.dataset.icon || '';
+      const to = p.icon ? typed : (icon ? icon + ' ' + p.name : typed);
+      if (to === from) return;
+      if (!Store.renameCategory('general', tab, from, to)) {
+        input.value = catName(from);
+        UI.toast('같은 이름의 카테고리가 이미 있어요');
+        return;
+      }
+      UI.toast('이름을 바꿨어요');
+      draw();
+      render();
+    }
+
+    function bindList() {
+      if (!formEl) return;
+      formEl.querySelectorAll('.cat-man-input').forEach(function (input) {
+        input.addEventListener('change', function () { rename(input); });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        });
+      });
+      formEl.querySelectorAll('.cat-man-del').forEach(function (b) {
+        b.addEventListener('click', function () {
+          Store.removeCategory('general', tab, b.dataset.del);
+          UI.toast('카테고리를 지웠어요');
+          draw();
+          render();
+        });
+      });
+    }
+
+    function addFromInput() {
+      const input = formEl.querySelector('#cat-new');
+      const v = input.value.trim();
+      if (!v) { input.focus(); return; }
+      if (!Store.addCategory('general', tab, v)) {
+        UI.toast('같은 이름의 카테고리가 이미 있어요');
+        return;
+      }
+      input.value = '';
+      UI.toast('카테고리를 추가했어요');
+      draw();
+      render();
+    }
+
+    const body = '' +
+      '<div class="seg seg-2" id="cat-tab">' +
+        '<button type="button" data-ctab="expense" class="is-on">지출</button>' +
+        '<button type="button" data-ctab="income">수입</button>' +
+      '</div>' +
+      '<div class="helper" style="margin:9px 0 10px">이름을 고치면 지난 내역의 카테고리도 함께 바뀌고, 지워도 지난 내역은 그대로 남아요. 이모지를 앞에 붙이면 아이콘으로 보여요.</div>' +
+      '<div class="cat-man-list" id="cat-man-list">' + rowsHTML() + '</div>' +
+      '<div class="cat-man-add">' +
+        '<input class="input" id="cat-new" maxlength="24" placeholder="예: 🍽️ 식비" aria-label="새 카테고리">' +
+        '<button type="button" class="btn small primary" id="cat-add">추가</button>' +
+      '</div>' +
+      '<button type="button" class="btn small ghost block" id="cat-reset" style="margin-top:8px">기본 카테고리로 되돌리기</button>';
+
+    UI.openSheet({
+      title: '카테고리 관리',
+      subtitle: '일반 가계부 ' + (tab === 'expense' ? '지출' : '수입') + ' 카테고리',
+      body: body,
+      noFocus: true,
+      buttons: [{ label: '닫기', kind: 'ghost' }],
+      onMount: function (form) {
+        formEl = form;
+        form.querySelectorAll('[data-ctab]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            tab = b.dataset.ctab;
+            form.querySelectorAll('[data-ctab]').forEach(function (x) {
+              x.classList.toggle('is-on', x.dataset.ctab === tab);
+            });
+            const sub = form.closest('.sheet') && form.closest('.sheet').querySelector('.sheet-head p');
+            if (sub) sub.textContent = '일반 가계부 ' + (tab === 'expense' ? '지출' : '수입') + ' 카테고리';
+            draw();
+          });
+        });
+        bindList();
+
+        form.querySelector('#cat-add').addEventListener('click', addFromInput);
+        form.querySelector('#cat-new').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); addFromInput(); }
+        });
+        form.querySelector('#cat-reset').addEventListener('click', function () {
+          UI.confirmDialog({
+            title: '기본 카테고리로 되돌릴까요?',
+            message: '일반 가계부 ' + (tab === 'expense' ? '지출' : '수입') + ' 카테고리를 처음 19가지 목록으로 되돌려요. 지난 내역은 그대로 남아요.',
+            confirmLabel: '되돌리기',
+            danger: true,
+            onConfirm: function () {
+              Store.resetCatList('general', tab);
+              UI.toast('기본 카테고리로 되돌렸어요');
+              render();
+              openCatManager();
+            }
+          });
+        });
+      }
+    });
   }
 
   /* ---------- 입력 ---------- */
   function chipsHTML(type, chosen) {
-    const list = CATS[book][type].concat(Store.customCats(book, type).filter(function (c) {
-      return CATS[book][type].indexOf(c) < 0;
-    }));
+    const list = Store.catList(book, type);
     return list.map(function (c) {
       return '<button type="button" class="chip ' + (c === chosen ? 'is-on' : '') + '" data-cat="' + UI.esc(c) + '">' + UI.esc(c) + '</button>';
     }).join('') + '<button type="button" class="chip chip-add" data-cat-custom="1">＋ 직접</button>';
@@ -431,7 +833,7 @@
             UI.toast('금액을 적어 주세요');
             return false;
           }
-          if (customMode && category) Store.addCustomCat(book, type, category);
+          if (customMode && category) Store.addCategory(book, type, category);
           if (isNew) {
             Store.add('finance', { date: date, book: book, type: type, amount: amount, category: category, memo: memo });
           } else {

@@ -7,7 +7,7 @@ window.Store = (function () {
 
   const KEY = 'myDiaryApp.v1';
   const VERSION = 2;
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.4.0';
 
   // 컬렉션 정의: 이름 -> 데이터 키 / 표시 이름
   const COLLECTIONS = {
@@ -18,7 +18,26 @@ window.Store = (function () {
     page: { key: 'items', label: '다이어리' },
     diary: { key: 'entries', label: '일기' },
     dream: { key: 'items', label: '꿈' },
-    links: { key: 'items', label: '바로가기' }
+    links: { key: 'items', label: '바로가기' },
+    recurring: { key: 'items', label: '고정 수입/지출' }
+  };
+
+  /* ---------- 카테고리 기본값 ---------- */
+  // 일반 가계부 지출 19가지 (사용자가 「카테고리 관리」에서 고치거나 지울 수 있어요)
+  const CAT_DEFAULTS = {
+    general: {
+      expense: [
+        '🍽️ 식비', '🍽️ 외식', '🛍️ 생활용품', '🚊 교통비', '💡 공과금',
+        '📱 통신비', '💸 저축,대출이자', '💵 보험료', '👕 의류비', '✈️ 여가,문화생활',
+        '💄 미용·헤어', '👦 아들관련', '📚 교육,책구매', '💊 의료·건강', '🏃 운동',
+        '🧾 기타', '🏦 이체 수수료', '📉 주식 손실', '💳 ?'
+      ],
+      income: ['급여', '용돈', '이자/배당', '중고거래', '환급', '부수입', '기타수입']
+    },
+    invest: {
+      income: ['카드테크', '포인트&현금', '주식', '투자', '공모주', '이자/배당', '기타'],
+      expense: ['수수료', '세금', '손실', '기타']
+    }
   };
 
   // 테마 기본값 (테마는 settings 안에 함께 저장돼 백업에도 들어갑니다)
@@ -36,6 +55,7 @@ window.Store = (function () {
       diary: { entries: [] },
       dream: { items: [] },
       links: { items: [] },
+      recurring: { items: [] },
       settings: {
         seeded: false,
         createdAt: new Date().toISOString(),
@@ -103,6 +123,10 @@ window.Store = (function () {
     if (raw.settings && typeof raw.settings === 'object') {
       Object.assign(out.settings, raw.settings);
     }
+    out.settings.catList = cleanCatList(out.settings.catList);
+
+    // 고정 수입/지출은 백업·가져오기 파일에서 와도 모양을 다져 둡니다.
+    out.recurring.items = out.recurring.items.map(cleanRule);
     if (!out.settings.theme || typeof out.settings.theme !== 'object') {
       out.settings.theme = Object.assign({}, THEME_DEFAULT);
     }
@@ -399,6 +423,258 @@ window.Store = (function () {
     return true;
   }
 
+  /* ---------- 카테고리 목록 (기본값을 고치거나 지울 수 있게) ---------- */
+  function cleanLabelList(arr) {
+    if (Object.prototype.toString.call(arr) !== '[object Array]') return null;
+    const out = [];
+    arr.forEach(function (v) {
+      const s = String(v == null ? '' : v).trim().slice(0, 24);
+      if (s && out.indexOf(s) < 0) out.push(s);
+    });
+    return out;
+  }
+
+  function cleanCatList(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const out = {};
+    ['general', 'invest'].forEach(function (b) {
+      const src = raw[b];
+      if (!src || typeof src !== 'object') return;
+      ['expense', 'income'].forEach(function (t) {
+        const list = cleanLabelList(src[t]);
+        if (!list) return;
+        if (!out[b]) out[b] = {};
+        out[b][t] = list;
+      });
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  function defaultCats(book, type) {
+    const base = (CAT_DEFAULTS[book] && CAT_DEFAULTS[book][type]) ? CAT_DEFAULTS[book][type].slice() : [];
+    customCats(book, type).forEach(function (c) { if (base.indexOf(c) < 0) base.push(c); });
+    return base;
+  }
+
+  // settings.catList 가 있으면 그게 정답, 없으면 기본값 + 예전에 직접 넣은 것
+  function catList(book, type) {
+    const cl = state.settings.catList;
+    if (cl && cl[book] && Object.prototype.toString.call(cl[book][type]) === '[object Array]') {
+      return cl[book][type].slice();
+    }
+    return defaultCats(book, type);
+  }
+
+  function ensureCatList() {
+    if (!state.settings.catList) state.settings.catList = {};
+    const cl = state.settings.catList;
+    ['general', 'invest'].forEach(function (b) {
+      if (!cl[b]) cl[b] = {};
+      ['expense', 'income'].forEach(function (t) {
+        if (Object.prototype.toString.call(cl[b][t]) !== '[object Array]') {
+          cl[b][t] = defaultCats(b, t);
+        }
+      });
+    });
+    return cl;
+  }
+
+  function writeCatList(book, type, list) {
+    const cl = ensureCatList();
+    if (!cl[book]) cl[book] = {};
+    cl[book][type] = cleanLabelList(list) || [];
+    return cl[book][type];
+  }
+
+  function setCatList(book, type, list) {
+    const arr = writeCatList(book, type, list);
+    save();
+    notify();
+    return arr;
+  }
+
+  function addCategory(book, type, label) {
+    const s = String(label == null ? '' : label).trim().slice(0, 24);
+    if (!s) return false;
+    const list = catList(book, type);
+    if (list.indexOf(s) >= 0) return false;
+    list.push(s);
+    setCatList(book, type, list);
+    return true;
+  }
+
+  // 이름을 바꾸면 지난 내역·고정 내역의 카테고리도 함께 바뀝니다.
+  function renameCategory(book, type, from, to) {
+    const a = String(from == null ? '' : from).trim();
+    const b = String(to == null ? '' : to).trim().slice(0, 24);
+    if (!a || !b) return false;
+    const list = catList(book, type);
+    const i = list.indexOf(a);
+    if (i < 0) return false;
+    if (a === b) return true;
+    if (list.indexOf(b) >= 0) return false;
+    list[i] = b;
+    state.finance.items.forEach(function (x) {
+      if ((x.book || 'general') === book && x.type === type && x.category === a) x.category = b;
+    });
+    state.recurring.items.forEach(function (r) {
+      if (r.type === type && r.category === a) r.category = b;
+    });
+    setCatList(book, type, list);
+    return true;
+  }
+
+  // 카테고리를 지워도 이미 적어 둔 내역은 그대로 남습니다.
+  function removeCategory(book, type, label) {
+    const s = String(label == null ? '' : label).trim();
+    const list = catList(book, type).filter(function (c) { return c !== s; });
+    setCatList(book, type, list);
+    return true;
+  }
+
+  function resetCatList(book, type) {
+    const cl = state.settings.catList;
+    if (cl && cl[book]) {
+      delete cl[book][type];
+      if (!Object.keys(cl[book]).length) delete cl[book];
+    }
+    save();
+    notify();
+    return catList(book, type);
+  }
+
+  /* ---------- 고정 수입/지출 ---------- */
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function cleanRule(raw) {
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const type = r.type === 'income' ? 'income' : 'expense';
+    const day = Math.min(31, Math.max(1, Math.round(Number(r.day) || 1)));
+    const amount = Math.max(0, Math.round(Number(String(r.amount == null ? '' : r.amount).replace(/[^\d-]/g, '')) || 0));
+    const category = String(r.category == null ? '' : r.category).trim().slice(0, 24) ||
+      (type === 'income' ? '기타수입' : '🧾 기타');
+    return {
+      id: r.id ? String(r.id) : uid('rec'),
+      name: String(r.name == null ? '' : r.name).trim().slice(0, 40) || '고정 항목',
+      type: type,
+      amount: amount,
+      day: day,
+      category: category,
+      method: String(r.method == null ? '' : r.method).trim().slice(0, 12) || '현금',
+      active: r.active === false ? false : true,
+      createdAt: r.createdAt || new Date().toISOString(),
+      updatedAt: r.updatedAt || null,
+      lastPosted: typeof r.lastPosted === 'string' ? r.lastPosted : ''
+    };
+  }
+
+  function recurringRules() {
+    return state.recurring.items.slice().sort(function (a, b) {
+      if (a.day !== b.day) return a.day - b.day;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  }
+
+  function addRecurring(rule) {
+    const row = cleanRule(rule);
+    row.createdAt = new Date().toISOString();
+    row.updatedAt = row.createdAt;
+    state.recurring.items.push(row);
+    save();
+    notify();
+    return row;
+  }
+
+  function updateRecurring(id, patch) {
+    const row = state.recurring.items.find(function (r) { return r.id === id; });
+    if (!row) return null;
+    const merged = cleanRule(Object.assign({}, row, patch || {}));
+    merged.id = row.id;
+    merged.createdAt = row.createdAt;
+    merged.lastPosted = row.lastPosted;
+    merged.updatedAt = new Date().toISOString();
+    Object.assign(row, merged);
+    save();
+    notify();
+    return row;
+  }
+
+  function toggleRecurring(id) {
+    const row = state.recurring.items.find(function (r) { return r.id === id; });
+    if (!row) return null;
+    row.active = row.active === false;
+    row.updatedAt = new Date().toISOString();
+    save();
+    notify();
+    return row;
+  }
+
+  function removeRecurring(id) {
+    const i = state.recurring.items.findIndex(function (r) { return r.id === id; });
+    if (i < 0) return false;
+    state.recurring.items.splice(i, 1);
+    save();
+    notify();
+    return true;
+  }
+
+  function recurringTotals() {
+    const out = { income: 0, expense: 0 };
+    state.recurring.items.forEach(function (r) {
+      if (r.active === false) return;
+      out[r.type === 'income' ? 'income' : 'expense'] += Number(r.amount) || 0;
+    });
+    return out;
+  }
+
+  function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+  /**
+   * 고정 수입/지출을 이번 달 일반 가계부에 자동 기록합니다.
+   * · 오늘 날짜 기준 rule.day <= 오늘 인 건만
+   * · 같은 달(YYYY-MM)에 이미 기록된 건은 recurringKey 로 걸러 중복을 막습니다.
+   * · 사용자가 지운 건은 rule.lastPosted 때문에 다시 생기지 않습니다.
+   */
+  function autoPostRecurring(when) {
+    const today = (when instanceof Date) ? when : new Date();
+    const ym = today.getFullYear() + '-' + pad2(today.getMonth() + 1);
+    const todayDate = today.getDate();
+    const last = daysInMonth(today.getFullYear(), today.getMonth() + 1);
+    let added = 0, changed = false;
+
+    state.recurring.items.forEach(function (r) {
+      if (r.active === false) return;
+      const day = Math.min(Math.max(1, Number(r.day) || 1), last);
+      if (day > todayDate) return;
+      if (r.lastPosted === ym) return;
+      const key = r.id + '@' + ym;
+      const exists = state.finance.items.some(function (x) { return x.recurringKey === key; });
+      if (exists) { r.lastPosted = ym; changed = true; return; }
+      const now = new Date().toISOString();
+      state.finance.items.push({
+        id: uid('fin'),
+        createdAt: now,
+        updatedAt: now,
+        date: ym + '-' + pad2(day),
+        book: 'general',
+        type: r.type === 'income' ? 'income' : 'expense',
+        amount: Number(r.amount) || 0,
+        category: r.category,
+        method: r.method,
+        memo: r.name,
+        recurring: true,
+        recurringKey: key,
+        ruleId: r.id
+      });
+      r.lastPosted = ym;
+      added += 1;
+      changed = true;
+    });
+
+    if (changed) { save(); notify(); }
+    return added;
+  }
+
   /* ---------- 백업 ---------- */
   function exportPayload() {
     return {
@@ -415,6 +691,7 @@ window.Store = (function () {
         diary: state.diary,
         dream: state.dream,
         links: state.links,
+        recurring: state.recurring,
         settings: state.settings
       }))
     };
@@ -426,7 +703,7 @@ window.Store = (function () {
       throw new Error('백업 파일의 형식을 알 수 없습니다.');
     }
     const incoming = normalize(src);
-    const result = { added: 0, replaced: false };
+    const result = { added: 0, cats: 0, replaced: false };
 
     if (mode === 'replace') {
       state = incoming;
@@ -446,6 +723,24 @@ window.Store = (function () {
         });
       });
       state.settings.seeded = true;
+
+      // 카테고리 목록은 겹치지 않게 합칩니다(사용자가 고친 목록이 있으면 그 기준).
+      const inc = incoming.settings.catList;
+      if (inc) {
+        ['general', 'invest'].forEach(function (b) {
+          if (!inc[b]) return;
+          ['expense', 'income'].forEach(function (t) {
+            if (!Array.isArray(inc[b][t])) return;
+            const base = catList(b, t);
+            let n = 0;
+            inc[b][t].forEach(function (c) {
+              if (base.indexOf(c) < 0) { base.push(c); n += 1; }
+            });
+            writeCatList(b, t, base);
+            result.cats += n;
+          });
+        });
+      }
     }
 
     save();
@@ -546,10 +841,10 @@ window.Store = (function () {
 
     state.finance.items = [
       fin(t, 'general', 'income', 45000, '중고거래', '안 쓰는 책 판매'),
-      fin(t, 'general', 'expense', 5800, '카페', '친구와 커피'),
-      fin(y, 'general', 'expense', 42300, '장보기', '이번 주 장보기'),
-      fin(isoAdd(t, -2), 'general', 'expense', 4200, '교통', '버스·지하철'),
-      fin(isoAdd(t, -3), 'general', 'expense', 12900, '교육', '온라인 강의'),
+      fin(t, 'general', 'expense', 5800, '🍽️ 외식', '친구와 커피'),
+      fin(y, 'general', 'expense', 42300, '🍽️ 식비', '이번 주 장보기'),
+      fin(isoAdd(t, -2), 'general', 'expense', 4200, '🚊 교통비', '버스·지하철'),
+      fin(isoAdd(t, -3), 'general', 'expense', 12900, '📚 교육,책구매', '온라인 강의'),
       fin(t, 'invest', 'income', 176958, '카드테크', '카드 포인트 적립'),
       fin(t, 'invest', 'income', 128962, '포인트&현금', '포인트 전환'),
       fin(t, 'invest', 'income', 93784, '주식', '배당금 입금'),
@@ -695,6 +990,20 @@ window.Store = (function () {
     clearDiaryLock: clearDiaryLock,
     customCats: customCats,
     addCustomCat: addCustomCat,
+    CAT_DEFAULTS: CAT_DEFAULTS,
+    catList: catList,
+    setCatList: setCatList,
+    addCategory: addCategory,
+    renameCategory: renameCategory,
+    removeCategory: removeCategory,
+    resetCatList: resetCatList,
+    recurringRules: recurringRules,
+    addRecurring: addRecurring,
+    updateRecurring: updateRecurring,
+    toggleRecurring: toggleRecurring,
+    removeRecurring: removeRecurring,
+    recurringTotals: recurringTotals,
+    autoPostRecurring: autoPostRecurring,
     THEME_DEFAULT: THEME_DEFAULT,
     seedSample: seedSample,
     subscribe: function (fn) { listeners.push(fn); return function () { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },

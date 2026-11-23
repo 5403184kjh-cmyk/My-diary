@@ -2041,3 +2041,53 @@ html.lb-open{overflow:hidden;}
   color:var(--terra-dark);
   letter-spacing:-.01em;
 }
+
+/* =========================================================
+   22. 일반 가계부: 고정 수입/지출 · 카테고리 관리
+   ========================================================= */
+.fin-tools{display:flex;gap:8px;margin:12px 0 6px;}
+.fin-tools .mini-btn{flex:1;height:38px;justify-content:center;font-size:12.5px;border-radius:12px;}
+.fin-tools .mini-btn.terra{font-weight:800;}
+
+.type-badge.fix-b{background:#E8F0FB;color:#1B5CA8;}
+
+/* 고정 내역 목록 */
+.rec-total{
+  display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;
+  background:#fff;border:1px solid var(--line-soft);border-radius:14px;
+  padding:11px 13px;margin-bottom:10px;
+  font-size:12.5px;font-weight:800;color:var(--ink-soft);
+  font-variant-numeric:tabular-nums;
+}
+.rec-total b{font-weight:900;}
+.rec-total b.inc{color:var(--sage);}
+.rec-total b.exp{color:var(--terra);}
+.rec-total .rec-cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);}
+.rec-list{margin-top:14px;border-top:1px solid var(--line-soft);}
+.rec-row{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line-soft);}
+.rec-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 0;text-align:left;background:none;}
+.rec-main .fin-amt{font-size:13.5px;}
+.rec-row.is-off .rec-main{opacity:.45;}
+.rec-toggle{
+  flex:none;height:28px;padding:0 9px;border-radius:9px;
+  background:var(--bg-soft);color:var(--muted);
+  font-size:10.5px;font-weight:800;letter-spacing:-.02em;
+}
+.rec-toggle.is-on{background:var(--sage-soft);color:#14653B;}
+.rec-day-wrap{position:relative;}
+.rec-day-wrap .input{padding-right:34px;}
+.rec-day-wrap .input::-webkit-outer-spin-button,
+.rec-day-wrap .input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.rec-day-unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:var(--muted);}
+
+/* 카테고리 관리 */
+.cat-man-list{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.cat-man-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line-soft);border-radius:12px;padding:5px 6px 5px 9px;}
+.cat-man-row .cat-ic{width:28px;height:28px;border-radius:9px;font-size:14px;}
+.cat-man-input{flex:1;min-width:0;border:0;background:none;font-size:14px;font-weight:700;color:var(--ink);padding:8px 2px;}
+.cat-man-input:focus{outline:none;}
+.cat-man-del{flex:none;width:30px;height:30px;border-radius:9px;color:#B9AA99;font-size:13px;font-weight:800;background:var(--bg-soft);}
+.cat-man-del:active{background:#FCEDEA;color:var(--danger);}
+.cat-man-add{display:flex;gap:6px;margin-top:10px;}
+.cat-man-add .input{flex:1;min-width:0;min-height:40px;}
+.cat-man-add .btn{flex:none;height:40px;}
