@@ -7,7 +7,7 @@ window.Store = (function () {
 
   const KEY = 'myDiaryApp.v1';
   const VERSION = 2;
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.4.1';
 
   // 컬렉션 정의: 이름 -> 데이터 키 / 표시 이름
   const COLLECTIONS = {

@@ -190,11 +190,20 @@
     const map = {};
     list.filter(function (x) { return x.type === type; }).forEach(function (x) {
       const c = x.category || '기타';
-      map[c] = (map[c] || 0) + (Number(x.amount) || 0);
+      if (!map[c]) map[c] = { cat: c, amount: 0, count: 0 };
+      map[c].amount += (Number(x.amount) || 0);
+      map[c].count += 1;
     });
-    const total = Object.keys(map).reduce(function (a, k) { return a + map[k]; }, 0);
+    const total = Object.keys(map).reduce(function (a, k) { return a + map[k].amount; }, 0);
     return Object.keys(map).map(function (k) {
-      return { name: catName(k), amount: map[k], pct: total ? (map[k] / total) * 100 : 0 };
+      const r = map[k];
+      return {
+        cat: r.cat,
+        name: catName(k),
+        amount: r.amount,
+        count: r.count,
+        pct: total ? (r.amount / total) * 100 : 0
+      };
     }).sort(function (a, b) { return b.amount - a.amount; });
   }
 
@@ -297,13 +306,75 @@
 
   function statRowsHTML(rows, total) {
     return '<div class="st-rows">' + rows.map(function (row, i) {
-      return '<div class="st-row">' +
+      return '<button type="button" class="st-row st-row-btn" data-scat="' + UI.esc(row.cat) + '" aria-label="' + UI.esc(row.name) + ' 내역 보기">' +
         '<span class="st-badge" style="background:' + PIE_COLORS[i % PIE_COLORS.length] + '">' + Math.round(row.pct) + '%</span>' +
         '<span class="st-name">' + UI.esc(row.name) + '</span>' +
+        '<span class="st-cnt">' + row.count + '건</span>' +
         '<span class="st-amt">' + UI.fmtWon(row.amount) + '</span>' +
-      '</div>';
+        '<span class="st-go" aria-hidden="true">›</span>' +
+      '</button>';
     }).join('') + '</div>' +
-      '<div class="st-total"><span>' + TYPES[statType].label + ' 합계</span><b>' + UI.fmtWon(total) + '</b></div>';
+      '<div class="st-total"><span>' + TYPES[statType].label + ' 합계</span><b>' + UI.fmtWon(total) + '</b></div>' +
+      '<div class="helper st-hint">카테고리를 누르면 그 달의 내역을 하나씩 볼 수 있어요.</div>';
+  }
+
+  /* ---------- 카테고리 상세 (통계 행을 누르면 그 달의 내역) ---------- */
+  function catItems(cat, type) {
+    return bookItems().filter(function (x) {
+      return x.type === type && (x.category || '기타') === cat;
+    }).sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+  }
+
+  function detailRowHTML(item) {
+    const t = TYPES[item.type] || TYPES.expense;
+    const d = UI.parseISO(item.date);
+    const title = String(item.memo || '').trim() || catName(item.category || '기타');
+    const method = String(item.method || '').trim();
+    return '<button type="button" class="sd-row" data-id="' + UI.esc(item.id) + '">' +
+        '<span class="sd-date"><b>' + (d.getMonth() + 1) + '/' + d.getDate() + '</b><i>' + UI.WEEK[d.getDay()] + '</i></span>' +
+        '<span class="sd-main">' +
+          '<span class="sd-title">' + UI.esc(title) +
+            (item.recurring ? '<span class="type-badge fix-b">고정</span>' : '') +
+          '</span>' +
+          (method ? '<span class="sd-sub">' + UI.esc(method) + '</span>' : '') +
+        '</span>' +
+        '<span class="sd-amt ' + t.cls + '">' + amountText(item) + '</span>' +
+      '</button>';
+  }
+
+  function openCatDetail(cat, type) {
+    const items = catItems(cat, type);
+    const sum = items.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0);
+    const t = TYPES[type] || TYPES.expense;
+
+    const body = items.length
+      ? '<div class="sd-list">' + items.map(detailRowHTML).join('') + '</div>' +
+        '<div class="helper" style="margin:10px 2px 2px">내역을 누르면 고치거나 지울 수 있어요.</div>'
+      : '<div class="empty"><span class="emo">🧾</span>이 카테고리에는 이 달 내역이 없어요.</div>';
+
+    function backToDetail() {
+      if (!catItems(cat, type).length) return;   // 다 지웠으면 통계 화면에 그대로
+      openCatDetail(cat, type);
+    }
+
+    UI.openSheet({
+      title: catName(cat) + ' (' + UI.koMonth(ym) + ')',
+      subtitle: t.label + ' · 총 ' + items.length + '건 / 합계 ' + UI.fmtWon(sum),
+      body: body,
+      noFocus: true,
+      buttons: [{ label: '닫기', kind: 'ghost' }],
+      onMount: function (form) {
+        form.querySelectorAll('.sd-row').forEach(function (b) {
+          b.addEventListener('click', function () {
+            const item = Store.find('finance', b.dataset.id);
+            if (item) openEditor(item, { back: backToDetail });
+          });
+        });
+      }
+    });
   }
 
   function statsHTML(list) {
@@ -384,6 +455,11 @@
       b.addEventListener('click', function () {
         statType = b.dataset.stype;
         render();
+      });
+    });
+    host.querySelectorAll('[data-scat]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        openCatDetail(b.dataset.scat, statType);
       });
     });
     host.querySelectorAll('.fin-row').forEach(function (b) {
@@ -786,8 +862,9 @@
     }).join('') + '<button type="button" class="chip chip-add" data-cat-custom="1">＋ 직접</button>';
   }
 
-  function openEditor(item) {
+  function openEditor(item, opts) {
     const isNew = !item;
+    const back = opts && typeof opts.back === 'function' ? opts.back : null;
     let type = isNew ? 'expense' : (item.type || 'expense');
     let cat = isNew ? '' : (item.category || '');
     let customMode = false;
@@ -843,8 +920,11 @@
           filter = 'all';
           render();
           UI.toast(isNew ? '내역을 기록했어요' : '저장했어요');
+          if (back) setTimeout(back, 0);
         } },
-      { label: '취소', kind: 'ghost' }
+      { label: '취소', kind: 'ghost', onClick: function () {
+        if (back) setTimeout(back, 0);
+      } }
     ];
     if (!isNew) {
       buttons.splice(1, 0, { label: '삭제', kind: 'danger', keepOpen: true, onClick: function (form, closeSheet) {
@@ -858,6 +938,7 @@
             Store.remove('finance', item.id);
             render();
             UI.toast('삭제했어요');
+            if (back) setTimeout(back, 0);
           }
         });
       } });
