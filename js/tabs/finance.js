@@ -51,10 +51,48 @@
   let filter = 'all';         // all | income | expense
   let statType = 'income';    // stats에서 보고 있는 구분
 
+  /* ---------- 일반 가계부 기간 (시작일 자유 설정) ---------- */
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function monthLen(y, m) { return new Date(y, m, 0).getDate(); }
+  function shiftYM(y, m, n) {
+    const d = new Date(y, m - 1 + n, 1);
+    return { y: d.getFullYear(), m: d.getMonth() + 1 };
+  }
+  // 그 달의 기간 시작일 (시작일 16일이면 2026-11-16, 말일이면 2026-11-30)
+  function startInMonth(y, m, sdOpt) {
+    const sd = sdOpt === undefined ? Store.financeSettings().startDay : sdOpt;
+    if (sd === 'last') return y + '-' + pad2(m) + '-' + pad2(monthLen(y, m));
+    const day = Math.min(Number(sd) || 1, monthLen(y, m));
+    return y + '-' + pad2(m) + '-' + pad2(day);
+  }
+  function nextStart(s, sdOpt) { const p = s.split('-').map(Number); const n = shiftYM(p[0], p[1], 1); return startInMonth(n.y, n.m, sdOpt); }
+  function prevStart(s, sdOpt) { const p = s.split('-').map(Number); const n = shiftYM(p[0], p[1], -1); return startInMonth(n.y, n.m, sdOpt); }
+  function periodOf(startISO) { return { start: startISO, end: UI.isoAdd(nextStart(startISO), -1) }; }
+  function periodStartOf(dateISO, sdOpt) {
+    const p = String(dateISO).split('-').map(Number);
+    const cand = startInMonth(p[0], p[1], sdOpt);
+    if (String(dateISO) >= cand) return cand;
+    const n = shiftYM(p[0], p[1], -1);
+    return startInMonth(n.y, n.m, sdOpt);
+  }
+  function dot(isoStr) { const p = String(isoStr).split('-').map(Number); return p[0] + '.' + p[1] + '.' + p[2]; }
+  function periodLabel(p) { return dot(p.start) + ' ~ ' + dot(p.end); }
+  function shortPeriod(p) {
+    const s = p.start.split('-').map(Number), e = p.end.split('-').map(Number);
+    if (s[0] !== e[0]) return dot(p.start) + ' ~ ' + dot(p.end);
+    return s[1] + '.' + s[2] + ' ~ ' + e[1] + '.' + e[2];
+  }
+  function curPeriod() { return periodOf(periodStart); }
+
+  let periodStart = periodStartOf(UI.todayISO());   // 일반 가계부에서 지금 보고 있는 기간의 시작일
+
   /* ---------- 데이터 ---------- */
   function bookItems() {
+    const p = book === 'general' ? curPeriod() : null;
     return Store.all('finance').filter(function (x) {
-      return (x.book || 'general') === book && UI.ymOf(x.date) === ym;
+      if ((x.book || 'general') !== book) return false;
+      if (p) return x.date >= p.start && x.date <= p.end;   // 일반 가계부는 사용자 지정 기간
+      return UI.ymOf(x.date) === ym;                        // 재테크 가계부는 달 단위
     });
   }
 
@@ -71,6 +109,21 @@
     if (diff === -1) return '지난 달';
     if (diff === 1) return '다음 달';
     return Math.abs(diff) + '개월 ' + (diff < 0 ? '전' : '후');
+  }
+
+  function periodTag() {
+    const cur = periodStartOf(UI.todayISO());
+    const p = periodStart.split('-').map(Number), c = cur.split('-').map(Number);
+    const diff = (p[0] - c[0]) * 12 + (p[1] - c[1]);
+    if (diff === 0) return '이번 기간';
+    if (diff === -1) return '지난 기간';
+    if (diff === 1) return '다음 기간';
+    return Math.abs(diff) + '기간 ' + (diff < 0 ? '전' : '후');
+  }
+
+  function startDayText() {
+    const d = Store.financeSettings().startDay;
+    return d === 'last' ? '말일 시작' : d + '일 시작';
   }
 
   function amountText(item) {
@@ -97,20 +150,69 @@
     '</div>';
   }
 
+  function formatPeriodHeadHTML(p) {
+    return '' +
+      '<div class="period-head">' +
+        '<button type="button" class="pnav" data-pnav="-1" aria-label="이전 기간">' + ICON.left + '</button>' +
+        '<div class="period-mid">' +
+          '<span class="period-range">' + periodLabel(p) + '</span>' +
+          '<span class="period-sub">' + startDayText() + ' · ' + periodTag() + '</span>' +
+        '</div>' +
+        '<button type="button" class="pnav" data-pnav="1" aria-label="다음 기간">' + ICON.right + '</button>' +
+      '</div>';
+  }
+
+  function budgetHTML(list) {
+    if (book !== 'general') return '';
+    const f = Store.financeSettings();
+    const exp = sumOf(list, 'expense');
+
+    if (!f.budget) {
+      return '<div class="budget budget-empty">' +
+        '<button type="button" class="budget-set" id="btn-budget">🎯 이번 기간 예산 정하기</button>' +
+        '<div class="helper" style="margin-top:6px">예산을 정하면 남은 금액과 진행률을 보여드려요.</div>' +
+      '</div>';
+    }
+
+    const pct = (exp / f.budget) * 100;
+    const over = exp > f.budget;
+    const left = f.budget - exp;
+    const w = Math.max(0, Math.min(100, pct));
+    return '' +
+      '<div class="budget">' +
+        '<div class="budget-head">' +
+          '<span>기간 예산 <b>' + UI.fmtWon(f.budget) + '</b></span>' +
+          '<button type="button" class="budget-set" id="btn-budget">고치기</button>' +
+        '</div>' +
+        '<div class="budget-bar' + (over ? ' is-over' : '') + '" role="img" aria-label="예산 사용률 ' + Math.round(pct) + '%"><i style="width:' + w.toFixed(1) + '%"></i></div>' +
+        '<div class="budget-foot">' +
+          '<span>지출 <b class="exp">' + UI.fmtWon(exp) + '</b></span>' +
+          '<span>' + (over
+            ? '초과 <b class="exp">' + UI.fmtWon(-left) + '</b>'
+            : '남은 <b class="inc">' + UI.fmtWon(left) + '</b>') +
+            ' · ' + Math.round(pct) + '% 사용</span>' +
+        '</div>' +
+      '</div>';
+  }
+
   function summaryHTML(list) {
     const inc = sumOf(list, 'income');
     const exp = sumOf(list, 'expense');
     const net = inc - exp;
-    return '' +
-      '<section class="summary summary-' + book + '">' +
-        '<div class="summary-top">' +
+    const head = book === 'general'
+      ? formatPeriodHeadHTML(curPeriod())
+      : '<div class="summary-top">' +
           '<div class="month-nav">' +
             '<button type="button" data-nav="-1" aria-label="이전 달">' + ICON.left + '</button>' +
             '<span class="month-label">' + UI.koMonth(ym) + '</span>' +
             '<button type="button" data-nav="1" aria-label="다음 달">' + ICON.right + '</button>' +
           '</div>' +
           '<span class="pill">' + BOOKS[book].short + ' · ' + monthTag() + '</span>' +
-        '</div>' +
+        '</div>';
+
+    return '' +
+      '<section class="summary summary-' + book + '">' +
+        head +
         '<div class="net">' +
           '<span class="label">순수익</span>' +
           '<span class="value ' + (net > 0 ? 'up' : (net < 0 ? 'down' : '')) + '">' + UI.fmtSigned(net) + '</span>' +
@@ -119,16 +221,20 @@
           '<div class="sg"><div class="k">수입</div><div class="v inc">' + UI.fmtWon(inc) + '</div></div>' +
           '<div class="sg"><div class="k">지출</div><div class="v exp">' + UI.fmtWon(exp) + '</div></div>' +
         '</div>' +
+        budgetHTML(list) +
       '</section>';
   }
 
   function toolsHTML() {
     if (book !== 'general') return '';
     const n = Store.recurringRules().length;
+    const f = Store.financeSettings();
     return '<div class="fin-tools">' +
       '<button type="button" class="mini-btn terra" id="btn-recurring">🔄 고정 수입/지출' + (n ? ' ' + n : '') + '</button>' +
       '<button type="button" class="mini-btn" id="btn-cats">🗂 카테고리 관리</button>' +
-    '</div>';
+    '</div>' +
+    '<button type="button" class="mini-btn terra fin-budget-bar" id="btn-budget">🎯 예산·기간 설정 · ' + startDayText() +
+      ' · ' + (f.budget ? UI.fmtWon(f.budget) : '예산 없음') + '</button>';
   }
 
   function viewSwitchHTML() {
@@ -164,8 +270,9 @@
 
   function listHTML(list) {
     if (!list.length) {
+      const where = book === 'general' ? '이 기간' : '이 달';
       return '<div class="empty"><span class="emo">🧾</span>' +
-        (filter === 'all' ? '이 장부에는 이 달 내역이 아직 없어요.' : '이 구분의 내역이 없어요.') +
+        (filter === 'all' ? '이 장부에는 ' + where + ' 내역이 아직 없어요.' : '이 구분의 내역이 없어요.') +
         '<br>아래 ＋ 버튼으로 첫 기록을 남겨 보세요.</div>';
     }
     return groupByDate(list).map(function (g) {
@@ -305,6 +412,7 @@
   }
 
   function statRowsHTML(rows, total) {
+    const where = book === 'general' ? '기간' : '달';
     return '<div class="st-rows">' + rows.map(function (row, i) {
       return '<button type="button" class="st-row st-row-btn" data-scat="' + UI.esc(row.cat) + '" aria-label="' + UI.esc(row.name) + ' 내역 보기">' +
         '<span class="st-badge" style="background:' + PIE_COLORS[i % PIE_COLORS.length] + '">' + Math.round(row.pct) + '%</span>' +
@@ -315,7 +423,7 @@
       '</button>';
     }).join('') + '</div>' +
       '<div class="st-total"><span>' + TYPES[statType].label + ' 합계</span><b>' + UI.fmtWon(total) + '</b></div>' +
-      '<div class="helper st-hint">카테고리를 누르면 그 달의 내역을 하나씩 볼 수 있어요.</div>';
+      '<div class="helper st-hint">카테고리를 누르면 이 ' + where + '의 내역을 하나씩 볼 수 있어요.</div>';
   }
 
   /* ---------- 카테고리 상세 (통계 행을 누르면 그 달의 내역) ---------- */
@@ -349,11 +457,12 @@
     const items = catItems(cat, type);
     const sum = items.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0);
     const t = TYPES[type] || TYPES.expense;
+    const rangeTxt = book === 'general' ? periodLabel(curPeriod()) : UI.koMonth(ym);
 
     const body = items.length
       ? '<div class="sd-list">' + items.map(detailRowHTML).join('') + '</div>' +
         '<div class="helper" style="margin:10px 2px 2px">내역을 누르면 고치거나 지울 수 있어요.</div>'
-      : '<div class="empty"><span class="emo">🧾</span>이 카테고리에는 이 달 내역이 없어요.</div>';
+      : '<div class="empty"><span class="emo">🧾</span>이 카테고리에는 이 ' + (book === 'general' ? '기간' : '달') + ' 내역이 없어요.</div>';
 
     function backToDetail() {
       if (!catItems(cat, type).length) return;   // 다 지웠으면 통계 화면에 그대로
@@ -361,7 +470,7 @@
     }
 
     UI.openSheet({
-      title: catName(cat) + ' (' + UI.koMonth(ym) + ')',
+      title: catName(cat) + ' (' + rangeTxt + ')',
       subtitle: t.label + ' · 총 ' + items.length + '건 / 합계 ' + UI.fmtWon(sum),
       body: body,
       noFocus: true,
@@ -392,14 +501,25 @@
       '</div>' +
       (rows.length
         ? '<div class="pie-card">' + pieSVG(rows) + '</div>' + statRowsHTML(rows, total)
-        : '<div class="empty"><span class="emo">📊</span>이 달에는 ' + TYPES[statType].label + ' 내역이 없어요.<br>내역을 남기면 그래프가 그려져요.</div>');
+        : '<div class="empty"><span class="emo">📊</span>이 ' + (book === 'general' ? '기간' : '달') + '에는 ' + TYPES[statType].label + ' 내역이 없어요.<br>내역을 남기면 그래프가 그려져요.</div>');
   }
 
   /* ---------- 그리기 ---------- */
   function render() {
     if (!host) return;
-    // 이번 달 고정 수입/지출 중 아직 기록되지 않은 건을 먼저 반영합니다.
-    try { Store.autoPostRecurring(); } catch (e) { console.warn(e); }
+    // 설정된 시작일과 보고 있는 기간의 시작일이 어긋나면(설정을 바꿨을 때) 오늘이 들어 있는 기간으로 맞춥니다.
+    try {
+      const sd = Store.financeSettings().startDay;
+      const ps = periodStart.split('-').map(Number);
+      if (periodStart !== startInMonth(ps[0], ps[1], sd)) periodStart = periodStartOf(UI.todayISO(), sd);
+    } catch (e) { console.warn(e); }
+    // 고정 수입/지출 중 아직 기록되지 않은, 날짜가 지난 건을 먼저 반영합니다.
+    // 지금 보고 있는 기간이 두 달에 걸쳐 있으면 그 두 달을 함께 확인하되(오늘까지 도래한 날짜만),
+    // 지난 기간을 넘겨 볼 때 과거 달이 새로 만들어지지는 않게 "오늘이 들어 있는 기간"만 채웁니다.
+    try {
+      const p = book === 'general' ? periodOf(periodStartOf(UI.todayISO())) : null;
+      Store.autoPostRecurring(null, p ? { from: p.start, to: p.end } : null);
+    } catch (e) { console.warn(e); }
     const all = bookItems();
     let list = all.slice();
     if (filter !== 'all') list = list.filter(function (x) { return x.type === filter; });
@@ -413,7 +533,8 @@
 
     const inc = sumOf(all, 'income'), exp = sumOf(all, 'expense');
     if (window.App && App.setSubtitle) {
-      App.setSubtitle(BOOKS[book].short + ' · ' + UI.koMonth(ym) + ' · 순수익 ' + UI.fmtSigned(inc - exp));
+      const span = book === 'general' ? shortPeriod(curPeriod()) : UI.koMonth(ym);
+      App.setSubtitle(BOOKS[book].short + ' · ' + span + ' · 순수익 ' + UI.fmtSigned(inc - exp));
     }
     if (window.App && App.showFab) {
       if (view === 'stats') App.hideFab();
@@ -437,6 +558,14 @@
       b.addEventListener('click', function () {
         ym = UI.monthShift(ym, Number(b.dataset.nav));
         render();
+      });
+    });
+    host.querySelectorAll('[data-pnav]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const n = Number(b.dataset.pnav);
+        periodStart = n < 0 ? prevStart(periodStart) : nextStart(periodStart);
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
     host.querySelectorAll('[data-view]').forEach(function (b) {
@@ -472,6 +601,9 @@
     if (reBtn) reBtn.addEventListener('click', openRecurring);
     const catBtn = host.querySelector('#btn-cats');
     if (catBtn) catBtn.addEventListener('click', openCatManager);
+    host.querySelectorAll('#btn-budget').forEach(function (b) {
+      b.addEventListener('click', openFinanceSetup);
+    });
   }
 
   /* ---------- 고정 수입/지출 ---------- */
@@ -854,7 +986,123 @@
     });
   }
 
+  /* ---------- 예산 · 기간 시작일 설정 ---------- */
+  function openFinanceSetup() {
+    const f = Store.financeSettings();
+    let day = f.startDay;
+    const today = UI.todayISO();
+
+    function chipsHTML() {
+      const days = [1, 5, 10, 15, 16, 20, 25, 28];
+      let html = days.map(function (d) {
+        return '<button type="button" class="chip' + (day === d ? ' is-on' : '') + '" data-day="' + d + '">' + d + '일</button>';
+      }).join('');
+      html += '<button type="button" class="chip' + (day === 'last' ? ' is-on' : '') + '" data-day="last">그 달 말일</button>';
+      return html;
+    }
+
+    const body = '' +
+      '<div class="field"><label>한 기간을 며칠부터 셀까요?</label>' +
+        '<div class="chips" id="bg-days">' + chipsHTML() + '</div>' +
+        '<div class="rec-day-wrap" style="margin-top:9px">' +
+          '<input class="input" type="number" id="bg-day" min="1" max="28" inputmode="numeric" placeholder="1~28" value="' + (day === 'last' ? '' : day) + '" aria-label="매월 시작일">' +
+          '<span class="rec-day-unit">일</span>' +
+        '</div>' +
+        '<div class="helper">1일부터가 아니어도 괜찮아요. 16일을 고르면 <b>11.16 ~ 12.15</b>처럼 그날부터 다음 달 하루 전까지가 한 기간이 돼요. (1~28일 또는 말일)</div>' +
+      '</div>' +
+      '<div class="bg-preview" id="bg-preview"></div>' +
+      '<div class="field"><label>한 기간 예산 (지출)</label>' +
+        '<div class="amount-wrap">' +
+          '<input class="input amount-input" id="bg-budget" inputmode="numeric" autocomplete="off" placeholder="예: 2,000,000" value="' + (f.budget ? Number(f.budget).toLocaleString('ko-KR') : '') + '" aria-label="한 기간 예산">' +
+          '<span class="amount-unit">원</span>' +
+        '</div>' +
+        '<div class="helper">비워 두면 예산 없이 내역만 보여드려요. 기간을 넘겨 봐도 같은 예산으로 계산해요.</div>' +
+      '</div>';
+
+    UI.openSheet({
+      title: '예산 · 기간 설정',
+      subtitle: '일반 가계부에만 적용돼요 · 재테크 가계부는 1일~말일 그대로',
+      body: body,
+      noFocus: true,
+      buttons: [
+        { label: '저장', kind: 'primary', submit: true, onClick: function (form) {
+            const budget = UI.parseAmount(form.querySelector('#bg-budget').value);
+            Store.setFinanceSettings({ startDay: day, budget: budget });
+            periodStart = periodStartOf(UI.todayISO());
+            render();
+            UI.toast(day === 'last' ? '말일부터 시작하는 기간으로 저장했어요' : day + '일부터 시작하는 기간으로 저장했어요');
+          } },
+        { label: '취소', kind: 'ghost' }
+      ],
+      onMount: function (form) {
+        UI.bindAmount(form.querySelector('#bg-budget'));
+        const dayInput = form.querySelector('#bg-day');
+        const prev = form.querySelector('#bg-preview');
+
+        function syncChips() {
+          form.querySelectorAll('#bg-days [data-day]').forEach(function (b) {
+            b.classList.toggle('is-on', String(b.dataset.day) === String(day));
+          });
+        }
+
+        function preview() {
+          const start = periodStartOf(today, day);
+          const p = { start: start, end: UI.isoAdd(nextStart(start, day), -1) };
+          const n = nextStart(start, day);
+          const p2 = { start: n, end: UI.isoAdd(nextStart(n, day), -1) };
+          prev.innerHTML = '<span>지금 이 설정이면</span><b>' + periodLabel(p) + '</b>' +
+            '<span class="bg-next">다음 기간 ' + shortPeriod(p2) + '</span>';
+        }
+
+        form.querySelectorAll('#bg-days [data-day]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            day = b.dataset.day === 'last' ? 'last' : Number(b.dataset.day);
+            dayInput.value = day === 'last' ? '' : day;
+            syncChips();
+            preview();
+          });
+        });
+
+        dayInput.addEventListener('input', function () {
+          const v = String(dayInput.value).replace(/[^0-9]/g, '').slice(0, 2);
+          if (dayInput.value !== v) dayInput.value = v;
+          if (v) {
+            let n = Number(v);
+            if (n > 28) { n = 28; dayInput.value = '28'; }
+            day = Math.max(1, n);
+            syncChips();
+            preview();
+          }
+        });
+        dayInput.addEventListener('blur', function () {
+          if (!dayInput.value) {
+            if (day === 'last') return;
+            dayInput.value = day;
+            return;
+          }
+          let n = Math.min(28, Math.max(1, Number(dayInput.value) || 1));
+          day = n;
+          dayInput.value = n;
+          syncChips();
+          preview();
+        });
+
+        syncChips();
+        preview();
+      }
+    });
+  }
+
   /* ---------- 입력 ---------- */
+  function defaultDate() {
+    const t = UI.todayISO();
+    if (book === 'general') {
+      const p = curPeriod();
+      return (t >= p.start && t <= p.end) ? t : p.start;
+    }
+    return UI.ymOf(t) === ym ? t : ym + '-01';
+  }
+
   function chipsHTML(type, chosen) {
     const list = Store.catList(book, type);
     return list.map(function (c) {
@@ -890,7 +1138,7 @@
         '<input class="input" id="cat-custom" placeholder="카테고리 직접 입력 (다음에도 남아요)" value="' + UI.esc(cat) + '" style="display:none;margin-top:8px" maxlength="12">' +
       '</div>' +
       '<div class="field"><label>날짜</label>' +
-        '<input class="input" type="date" id="fin-date" value="' + UI.esc(isNew ? (UI.ymOf(UI.todayISO()) === ym ? UI.todayISO() : ym + '-01') : item.date) + '">' +
+        '<input class="input" type="date" id="fin-date" value="' + UI.esc(isNew ? defaultDate() : item.date) + '">' +
       '</div>' +
       '<div class="field"><label>메모 (선택)</label>' +
         '<input class="input" type="text" id="fin-memo" maxlength="80" placeholder="예: 이번 주 장보기" value="' + UI.esc(isNew ? '' : (item.memo || '')) + '">' +
@@ -916,7 +1164,8 @@
           } else {
             Store.update('finance', item.id, { date: date, book: book, type: type, amount: amount, category: category, memo: memo });
           }
-          ym = UI.ymOf(date);
+          if (book === 'general') periodStart = periodStartOf(date);
+          else ym = UI.ymOf(date);
           filter = 'all';
           render();
           UI.toast(isNew ? '내역을 기록했어요' : '저장했어요');

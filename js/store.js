@@ -7,7 +7,7 @@ window.Store = (function () {
 
   const KEY = 'myDiaryApp.v1';
   const VERSION = 2;
-  const APP_VERSION = '1.4.1';
+  const APP_VERSION = '1.5.0';
 
   // 컬렉션 정의: 이름 -> 데이터 키 / 표시 이름
   const COLLECTIONS = {
@@ -62,6 +62,8 @@ window.Store = (function () {
         updatedAt: null,
         theme: Object.assign({}, THEME_DEFAULT),
         cats: { general: { expense: [], income: [] }, invest: { expense: [], income: [] } },
+        // 일반 가계부 기간·예산: startDay 1~28 또는 'last'(말일), budget 은 한 기간 지출 예산
+        finance: { startDay: 1, budget: 0 },
         // 일기 잠금: { enabled, hash, salt, webauthn: { id } | null, updatedAt }
         diaryLock: { enabled: false, hash: '', salt: '', webauthn: null, updatedAt: null }
       }
@@ -77,6 +79,21 @@ window.Store = (function () {
   }
 
   function pad(n) { return String(n).padStart(2, '0'); }
+
+  /* 일반 가계부 기간 시작일·예산 (백업 파일에 없거나 이상한 값이면 기본값으로) */
+  function cleanFinanceSettings(raw) {
+    const r = raw && typeof raw === 'object' ? raw : {};
+    let day = r.startDay;
+    if (day === 'last') {
+      day = 'last';
+    } else {
+      day = Math.round(Number(day));
+      if (!isFinite(day) || day < 1) day = 1;
+      else if (day > 28) day = 'last';   // 29~31일은 말일 시작과 같게
+    }
+    const budget = Math.max(0, Math.round(Number(String(r.budget == null ? '' : r.budget).replace(/[^\d]/g, '')) || 0));
+    return { startDay: day, budget: budget };
+  }
 
   function iso(d) {
     const x = d || new Date();
@@ -133,6 +150,7 @@ window.Store = (function () {
     if (!out.settings.cats || typeof out.settings.cats !== 'object') {
       out.settings.cats = { general: { expense: [], income: [] }, invest: { expense: [], income: [] } };
     }
+    out.settings.finance = cleanFinanceSettings(out.settings.finance);
     ['general', 'invest'].forEach(function (b) {
       if (!out.settings.cats[b]) out.settings.cats[b] = { expense: [], income: [] };
       ['expense', 'income'].forEach(function (t) {
@@ -404,6 +422,19 @@ window.Store = (function () {
     return state.settings.theme;
   }
 
+  /* ---------- 일반 가계부 기간 시작일·예산 ---------- */
+  function financeSettings() {
+    state.settings.finance = cleanFinanceSettings(state.settings.finance);
+    return state.settings.finance;
+  }
+
+  function setFinanceSettings(patch) {
+    state.settings.finance = cleanFinanceSettings(Object.assign({}, financeSettings(), patch || {}));
+    save();
+    notify();
+    return state.settings.finance;
+  }
+
   /* ---------- 직접 추가한 카테고리 ---------- */
   function customCats(book, type) {
     const s = state.settings;
@@ -562,6 +593,12 @@ window.Store = (function () {
       category: category,
       method: String(r.method == null ? '' : r.method).trim().slice(0, 12) || '현금',
       active: r.active === false ? false : true,
+      postedMonths: (function () {
+        const list = Array.isArray(r.postedMonths) ? r.postedMonths.filter(function (v) { return /^\d{4}-\d{2}$/.test(String(v)); }) : [];
+        const last = typeof r.lastPosted === 'string' ? r.lastPosted : '';
+        if (last && list.indexOf(last) < 0) list.push(last);
+        return list.slice(-36);
+      })(),
       createdAt: r.createdAt || new Date().toISOString(),
       updatedAt: r.updatedAt || null,
       lastPosted: typeof r.lastPosted === 'string' ? r.lastPosted : ''
@@ -592,6 +629,7 @@ window.Store = (function () {
     merged.id = row.id;
     merged.createdAt = row.createdAt;
     merged.lastPosted = row.lastPosted;
+    merged.postedMonths = (row.postedMonths || []).slice();
     merged.updatedAt = new Date().toISOString();
     Object.assign(row, merged);
     save();
@@ -630,45 +668,73 @@ window.Store = (function () {
   function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
 
   /**
-   * 고정 수입/지출을 이번 달 일반 가계부에 자동 기록합니다.
-   * · 오늘 날짜 기준 rule.day <= 오늘 인 건만
-   * · 같은 달(YYYY-MM)에 이미 기록된 건은 recurringKey 로 걸러 중복을 막습니다.
-   * · 사용자가 지운 건은 rule.lastPosted 때문에 다시 생기지 않습니다.
+   * 고정 수입/지출을 일반 가계부에 자동 기록합니다.
+   * · 오늘 날짜 기준 이미 지난 날짜만 기록합니다.
+   * · 같은 달(YYYY-MM)에 이미 기록된 건은 recurringKey / postedMonths 로 걸러 중복을 막습니다.
+   * · opts.from / opts.to (YYYY-MM-DD) 를 주면 두 달에 걸친 기간의 달을 모두 체크합니다(기간 조회용).
+   * · 규칙을 만들기 전 달은 채우지 않습니다.
    */
-  function autoPostRecurring(when) {
+  function autoPostRecurring(when, opts) {
     const today = (when instanceof Date) ? when : new Date();
-    const ym = today.getFullYear() + '-' + pad2(today.getMonth() + 1);
-    const todayDate = today.getDate();
-    const last = daysInMonth(today.getFullYear(), today.getMonth() + 1);
+    const todayStr = iso(today);
+    const thisYm = todayStr.slice(0, 7);
+    const monthEnd = thisYm + '-' + pad2(daysInMonth(today.getFullYear(), today.getMonth() + 1));
+    let from = opts && opts.from ? String(opts.from).slice(0, 10) : thisYm + '-01';
+    let to = opts && opts.to ? String(opts.to).slice(0, 10) : monthEnd;
+    if (from > to) { const tmp = from; from = to; to = tmp; }
+    if (to > todayStr) to = todayStr;          // 아직 오지 않은 날은 기록하지 않습니다.
+    if (from > to) return 0;
+
+    // 기간에 걸친 달 목록
+    const months = [];
+    let y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7));
+    const endY = Number(to.slice(0, 4)), endM = Number(to.slice(5, 7));
+    while (y < endY || (y === endY && m <= endM)) {
+      months.push(y + '-' + pad2(m));
+      m += 1;
+      if (m > 12) { m = 1; y += 1; }
+    }
+
     let added = 0, changed = false;
 
     state.recurring.items.forEach(function (r) {
       if (r.active === false) return;
-      const day = Math.min(Math.max(1, Number(r.day) || 1), last);
-      if (day > todayDate) return;
-      if (r.lastPosted === ym) return;
-      const key = r.id + '@' + ym;
-      const exists = state.finance.items.some(function (x) { return x.recurringKey === key; });
-      if (exists) { r.lastPosted = ym; changed = true; return; }
-      const now = new Date().toISOString();
-      state.finance.items.push({
-        id: uid('fin'),
-        createdAt: now,
-        updatedAt: now,
-        date: ym + '-' + pad2(day),
-        book: 'general',
-        type: r.type === 'income' ? 'income' : 'expense',
-        amount: Number(r.amount) || 0,
-        category: r.category,
-        method: r.method,
-        memo: r.name,
-        recurring: true,
-        recurringKey: key,
-        ruleId: r.id
+      const madeYm = String(r.createdAt || '').slice(0, 7);
+      if (!Array.isArray(r.postedMonths)) r.postedMonths = [];
+      if (r.lastPosted && r.postedMonths.indexOf(r.lastPosted) < 0) r.postedMonths.push(r.lastPosted);
+
+      months.forEach(function (mon) {
+        if (madeYm && mon < madeYm) return;              // 규칙을 만들기 전 달
+        if (r.postedMonths.indexOf(mon) >= 0) return;    // 이미 반영(지운 내역도 다시 생기지 않음)
+        const yy = Number(mon.slice(0, 4)), mm = Number(mon.slice(5, 7));
+        const day = Math.min(Math.max(1, Number(r.day) || 1), daysInMonth(yy, mm));
+        const dateISO = mon + '-' + pad2(day);
+        if (dateISO < from || dateISO > todayStr) return;
+        const key = r.id + '@' + mon;
+        const exists = state.finance.items.some(function (x) { return x.recurringKey === key; });
+        if (!exists) {
+          const now = new Date().toISOString();
+          state.finance.items.push({
+            id: uid('fin'),
+            createdAt: now,
+            updatedAt: now,
+            date: dateISO,
+            book: 'general',
+            type: r.type === 'income' ? 'income' : 'expense',
+            amount: Number(r.amount) || 0,
+            category: r.category,
+            method: r.method,
+            memo: r.name,
+            recurring: true,
+            recurringKey: key,
+            ruleId: r.id
+          });
+          added += 1;
+        }
+        r.postedMonths.push(mon);
+        r.lastPosted = mon;
+        changed = true;
       });
-      r.lastPosted = ym;
-      added += 1;
-      changed = true;
     });
 
     if (changed) { save(); notify(); }
@@ -990,6 +1056,8 @@ window.Store = (function () {
     clearDiaryLock: clearDiaryLock,
     customCats: customCats,
     addCustomCat: addCustomCat,
+    financeSettings: financeSettings,
+    setFinanceSettings: setFinanceSettings,
     CAT_DEFAULTS: CAT_DEFAULTS,
     catList: catList,
     setCatList: setCatList,
