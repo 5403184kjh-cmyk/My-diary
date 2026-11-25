@@ -103,8 +103,9 @@
   const PAY_SKIP_RE = /(해지하기|계좌개설|요금제|보험료청구|지정대리인청구|이체한도|한도계좌|혜택|이벤트)/i;
 
   function autoColorKey(it) {
+    // 제목(달력 막대에 보이는 글)만 보고 정합니다 — 메모에 숨어 있는 낱말 때문에 색이 달라지지 않게.
     // '화이자'는 '이자'로 잘못 읽히지 않도록 지우고 봅니다.
-    const t = (String((it && it.text) || '') + ' ' + String((it && it.memo) || '')).replace(/화이자/g, ' ');
+    const t = String((it && it.text) || '').replace(/화이자/g, ' ');
     if (BIRTH_RE.test(t)) return BIRTH_COLOR;                                        // ① 생일·생신
     if (PERIOD_RE.test(t) || CHILD_RE.test(t)) return AUTO_COLOR;                    // ② 생리·아이
     if (MED_RE.test(t)) return HOSP_COLOR;                                          // ③ 병원·검진
