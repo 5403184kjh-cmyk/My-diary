@@ -170,7 +170,11 @@
       location.reload();
     });
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {});
+      // updateViaCache: 'none' — GitHub Pages의 10분 HTTP 캐시를 건너뛰고 sw.js를 항상 새로 받아
+      // 새 버전이 바로 설치되게 합니다. reg.update()로 열 때마다 한 번 더 확인합니다.
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        reg.update().catch(function () {});
+      }).catch(function () {});
     });
   }
 })();
