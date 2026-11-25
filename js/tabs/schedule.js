@@ -35,7 +35,7 @@
   /* ---------- 달력 막대 색 ---------- */
   // 따로 고른 색이 없으면 제목으로 두 가지만 나눕니다.
   //   · 생리(월경) 일정, 아이(종원) 일정 → 초록
-  //   · 그 밖의 모든 일정 → 기본 파랑
+  //   · 그 밖의 모든 일정 → 기본 베이지
   // 사용자가 수정 창에서 색을 직접 고르면 그 색이 늘 우선입니다.
   const PALETTE = {
     rose:   { bg: '#FEAAC1', fg: '#7A0522' },
@@ -48,7 +48,7 @@
     gray:   { bg: '#DDD6D0', fg: '#574533' }
   };
   const PALETTE_ORDER = ['rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray'];
-  const DEFAULT_COLOR = 'blue';
+  const DEFAULT_COLOR = 'gray';   // 따뜻한 베이지 톤(#DDD6D0)
   const AUTO_COLOR = 'green';   // 생리·아이 일정에 쓰는 색
 
   // 제목에서 찾는 낱말 — 실제 구글 캘린더 기록(2017~2028)에서 쓰신 표기를 기준으로 골랐습니다.
@@ -74,7 +74,7 @@
     return L > 0.62 ? '#3B3026' : '#FFFFFF';
   }
 
-  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생리·아이는 초록, 나머지는 기본 파랑
+  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생리·아이는 초록, 나머지는 기본 베이지
   function colorOf(it) {
     const own = it && it.color ? String(it.color) : '';
     if (own && PALETTE[own]) return Object.assign({ key: own }, PALETTE[own]);
@@ -822,7 +822,7 @@
           '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">기본</button>' +
           swatches +
         '</div>' +
-        '<div class="helper">생리·아이 일정은 초록색, 그 외는 기본 파란색으로 표시되고 원할 때만 바꿀 수 있어요.</div>' +
+        '<div class="helper">생리·아이 일정은 초록색, 그 외는 기본 베이지색으로 표시되고 원할 때만 바꿀 수 있어요.</div>' +
       '</div>' +
       '<div class="field"><button type="button" class="pin-toggle ' + (star ? 'is-on' : '') + '" id="star-toggle">' +
         '<span class="sw"></span>중요하게 표시 (★)</button></div>';
