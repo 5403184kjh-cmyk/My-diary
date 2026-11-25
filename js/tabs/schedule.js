@@ -33,7 +33,8 @@
   let lastWidth = window.innerWidth;  // 마지막으로 확인한 창 너비
 
   /* ---------- 달력 막대 색 ---------- */
-  // 일정 제목에 자주 쓰는 낱말이 있으면 그 계열 색으로, 없으면 제목마다 늘 같은 색으로 보여 줍니다.
+  // 따로 고른 색이 없으면 모두 같은 기본색(파랑)으로 보여 줍니다.
+  // 색은 사용자가 할 일 수정 창에서 직접 고를 때만 달라집니다.
   const PALETTE = {
     rose:   { bg: '#FEAAC1', fg: '#7A0522' },
     coral:  { bg: '#FDC2AA', fg: '#7C2303' },
@@ -45,25 +46,7 @@
     gray:   { bg: '#DDD6D0', fg: '#574533' }
   };
   const PALETTE_ORDER = ['rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray'];
-  const COLOR_RULES = [
-    { re: /(생리|생리통|생리시작|PMS)/i, c: 'rose' },
-    { re: /(병원|치과|의원|한의원|약국|약\b|검진|혈압|접종|진료|처방|주사|임플란트|스케일링|건강)/, c: 'coral' },
-    { re: /(카드|실적|결제|은행|이자|포인트|급여|연금|보험|세금|납부|지로|대출|청구|환전|적립|페이)/i, c: 'blue' },
-    { re: /(장보기|마트|수퍼|슈퍼|구매|주문|배송|택배|통관|장바구니|시장)/, c: 'green' },
-    { re: /(학교|학원|교육|대회|시험|숙제|선생님|상담|과제|입학)/, c: 'purple' },
-    { re: /(여행|항공|비행기|비자|거주증|대사관|영사관|이사|호텔)/, c: 'teal' },
-    { re: /(생일|기념일|명절|추석|설날|크리스마스|파티|선물|축하)/, c: 'gold' }
-  ];
-  const FALLBACK = ['blue', 'green', 'purple', 'gold', 'teal', 'gray'];
-
-  function hashOf(str) {
-    let h = 2166136261 >>> 0;
-    const s = String(str || '');
-    for (let i = 0; i < s.length; i++) {
-      h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
-    }
-    return h >>> 0;
-  }
+  const DEFAULT_COLOR = 'blue';
 
   function hexFg(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
@@ -74,17 +57,12 @@
     return L > 0.62 ? '#3B3026' : '#FFFFFF';
   }
 
-  // 일정 하나의 색 { bg, fg, key }
+  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 늘 기본색
   function colorOf(it) {
     const own = it && it.color ? String(it.color) : '';
     if (own && PALETTE[own]) return Object.assign({ key: own }, PALETTE[own]);
     if (/^#[0-9a-f]{6}$/i.test(own)) return { key: 'custom', bg: own, fg: hexFg(own) };
-    const text = String(it && it.text || '');
-    for (let i = 0; i < COLOR_RULES.length; i++) {
-      if (COLOR_RULES[i].re.test(text)) return Object.assign({ key: COLOR_RULES[i].c }, PALETTE[COLOR_RULES[i].c]);
-    }
-    const key = FALLBACK[hashOf(text) % FALLBACK.length];
-    return Object.assign({ key: key }, PALETTE[key]);
+    return Object.assign({ key: DEFAULT_COLOR }, PALETTE[DEFAULT_COLOR]);
   }
 
   function colorVars(it) {
@@ -823,10 +801,10 @@
       '</div>' +
       '<div class="field"><label>달력 막대 색 (선택)</label>' +
         '<div class="color-pick" id="color-pick">' +
-          '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">자동</button>' +
+          '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">기본</button>' +
           swatches +
         '</div>' +
-        '<div class="helper">그냥 두면 제목에 맞춰 알맞은 색을 골라 드려요.</div>' +
+        '<div class="helper">그냥 두면 기본색으로 표시되고, 원할 때만 색을 골라 바꿀 수 있어요.</div>' +
       '</div>' +
       '<div class="field"><button type="button" class="pin-toggle ' + (star ? 'is-on' : '') + '" id="star-toggle">' +
         '<span class="sw"></span>중요하게 표시 (★)</button></div>';
