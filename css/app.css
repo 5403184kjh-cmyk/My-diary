@@ -1653,7 +1653,8 @@ html.lb-open{overflow:hidden;}
 @keyframes hdFlash{0%,45%{color:var(--terra);}100%{color:var(--ink);}}
 
 /* 색 고르기(일정 수정 시트) */
-.color-pick{display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
+.color-pick{display:flex;flex-direction:column;align-items:stretch;gap:9px;}
+.cp-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px 4px;justify-items:center;}
 .cp-dot{
   width:26px;height:26px;border-radius:50%;
   background:var(--cb);border:2px solid transparent;
@@ -1661,7 +1662,7 @@ html.lb-open{overflow:hidden;}
 }
 .cp-dot.is-on{border-color:var(--ink);}
 .cp-auto{
-  height:26px;padding:0 10px;border-radius:13px;
+  align-self:flex-start;height:26px;padding:0 10px;border-radius:13px;
   font-size:11px;font-weight:800;background:var(--cb);color:var(--cf);
   border:2px solid transparent;
 }

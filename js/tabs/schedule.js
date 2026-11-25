@@ -33,23 +33,44 @@
   let lastWidth = window.innerWidth;  // 마지막으로 확인한 창 너비
 
   /* ---------- 달력 막대 색 ---------- */
-  // 따로 고른 색이 없으면 제목으로 두 가지만 나눕니다.
+  // 따로 고른 색이 없으면 제목으로 세 가지만 나눕니다.
   //   · 생리(월경) 일정, 아이(종원) 일정 → 초록
+  //   · 카드 납부·이자·자동이체처럼 정해진 납부·이체 일정 → 보라
   //   · 그 밖의 모든 일정 → 기본 베이지
+  // 색은 여덟 계열이고, 계열마다 연한 톤과 진한 톤 두 가지를 고를 수 있습니다.
   // 사용자가 수정 창에서 색을 직접 고르면 그 색이 늘 우선입니다.
   const PALETTE = {
-    rose:   { bg: '#FEAAC1', fg: '#7A0522' },
-    coral:  { bg: '#FDC2AA', fg: '#7C2303' },
-    blue:   { bg: '#A7CBFB', fg: '#033277' },
-    green:  { bg: '#A3F0C0', fg: '#04672F' },
-    purple: { bg: '#D3B6F6', fg: '#3A0773' },
-    teal:   { bg: '#9FF4F3', fg: '#01656A' },
-    gold:   { bg: '#FDDE9B', fg: '#7A4B00' },
-    gray:   { bg: '#DDD6D0', fg: '#574533' }
+    rose:        { bg: '#FEAAC1', fg: '#7A0522' },
+    coral:       { bg: '#FDC2AA', fg: '#7C2303' },
+    blue:        { bg: '#A7CBFB', fg: '#033277' },
+    green:       { bg: '#A3F0C0', fg: '#04672F' },
+    purple:      { bg: '#D3B6F6', fg: '#3A0773' },
+    teal:        { bg: '#9FF4F3', fg: '#01656A' },
+    gold:        { bg: '#FDDE9B', fg: '#7A4B00' },
+    gray:        { bg: '#DDD6D0', fg: '#574533' },
+    rose_deep:   { bg: '#A81B4F', fg: '#FFFFFF' },
+    coral_deep:  { bg: '#B3441A', fg: '#FFFFFF' },
+    blue_deep:   { bg: '#1F4FA8', fg: '#FFFFFF' },
+    green_deep:  { bg: '#1B6E3C', fg: '#FFFFFF' },
+    purple_deep: { bg: '#5B2E9E', fg: '#FFFFFF' },
+    teal_deep:   { bg: '#0A6B70', fg: '#FFFFFF' },
+    gold_deep:   { bg: '#966800', fg: '#FFFFFF' },
+    gray_deep:   { bg: '#6B5B4B', fg: '#FFFFFF' }
   };
-  const PALETTE_ORDER = ['rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray'];
-  const DEFAULT_COLOR = 'gray';   // 따뜻한 베이지 톤(#DDD6D0)
-  const AUTO_COLOR = 'green';   // 생리·아이 일정에 쓰는 색
+  const PALETTE_LABEL = {
+    rose: '로즈 연한', coral: '코랄 연한', blue: '파랑 연한', green: '초록 연한',
+    purple: '보라 연한', teal: '청록 연한', gold: '골드 연한', gray: '베이지 연한',
+    rose_deep: '로즈 진한', coral_deep: '코랄 진한', blue_deep: '파랑 진한', green_deep: '초록 진한',
+    purple_deep: '보라 진한', teal_deep: '청록 진한', gold_deep: '골드 진한', gray_deep: '베이지 진한'
+  };
+  // 8칸씩 두 줄 — 윗줄 연한 톤, 아랫줄은 같은 색의 진한 톤
+  const PALETTE_ORDER = [
+    'rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray',
+    'rose_deep', 'coral_deep', 'blue_deep', 'green_deep', 'purple_deep', 'teal_deep', 'gold_deep', 'gray_deep'
+  ];
+  const DEFAULT_COLOR = 'gray';   // 그 외 일정 → 따뜻한 베이지 톤(#DDD6D0)
+  const AUTO_COLOR = 'green';     // 생리·아이 일정
+  const PAY_COLOR = 'purple';     // 카드 납부·이자 등 정해진 납부·이체
 
   // 제목에서 찾는 낱말 — 실제 구글 캘린더 기록(2017~2028)에서 쓰신 표기를 기준으로 골랐습니다.
   //   생리: 생리 · 생리시작 · 생리통 · 월경 · PMS
@@ -59,9 +80,23 @@
   const PERIOD_RE = /(생리|월경|PMS)/i;
   const CHILD_RE = /(종원|아들|학교|휴교|방학|개학|급식|학부모|성교육|WCA|큐브|대회)|(^|[^가-힣])아이([^가-힣]|$)|(^|[^가-힣])교정/i;
 
+  // 납부·이체 — 카드 납부·대출이자·자동이체처럼 정해진 날 돈이 나가는 일정
+  //   실제 달력 표기(2017~2028)에서 쓰신 말을 그대로 골랐습니다.
+  //   강한 표기: 이것만 있으면 납부로 봅니다. 예) 25일)삼성카드결제, 18일)도시가스, kb손해보험 수기결제
+  const PAY_STRONG_RE = /(지로|납입일|자동이체|자동결제|자동출금|수기결제|카뱅출금|계좌이체|이체확인|카드\s*결제|카드결제|카드\s*납부|대출금|도시가스|전기요금|수도요금|가스요금|관리비|공과금|보험3사|kb손보|정기보험|월드비전|마리아수녀회|상환|할부금|국민연금\s*(자동이체|결제|추납)|(적금|청약|저축)[^\n]{0,10}(입금|넣|이체))/i;
+  //   약한 표기: 납부와 상관없는 맥락(아래 NOT_PAY_RE)이 없을 때만 납부로 봅니다.
+  const PAY_WEAK_RE = /(납부|납입|추납|출금|청구서|이체|결제|보험|이자|요금|자동차세|재산세|주민세)/i;
+  //   납부가 아닌 맥락 — 가입·신청·청구·혜택·한도·해지 등
+  const NOT_PAY_RE = /(청구|가입|이벤트|한도|면제|해지|발급|신청|조회|비교|견적|영수증|보험용|이체액|급여이체|세금감면|무료|캐시백|포인트|적립|입금|상품권|쿠폰|개설|요금제|변경|고려)/i;
+  //   강한 표기라도 납부가 아닌 줄 — 해지·개설·한도·혜택 안내
+  const PAY_SKIP_RE = /(해지하기|계좌개설|요금제|보험료청구|지정대리인청구|이체한도|한도계좌|혜택|이벤트)/i;
+
   function autoColorKey(it) {
-    const t = String((it && it.text) || '') + ' ' + String((it && it.memo) || '');
+    // '화이자'는 '이자'로 잘못 읽히지 않도록 지우고 봅니다.
+    const t = (String((it && it.text) || '') + ' ' + String((it && it.memo) || '')).replace(/화이자/g, ' ');
     if (PERIOD_RE.test(t) || CHILD_RE.test(t)) return AUTO_COLOR;
+    if (PAY_STRONG_RE.test(t) && !PAY_SKIP_RE.test(t)) return PAY_COLOR;
+    if (PAY_WEAK_RE.test(t) && !NOT_PAY_RE.test(t)) return PAY_COLOR;
     return DEFAULT_COLOR;
   }
 
@@ -74,7 +109,7 @@
     return L > 0.62 ? '#3B3026' : '#FFFFFF';
   }
 
-  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생리·아이는 초록, 나머지는 기본 베이지
+  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생리·아이는 초록, 납부·이체는 보라, 나머지는 기본 베이지
   function colorOf(it) {
     const own = it && it.color ? String(it.color) : '';
     if (own && PALETTE[own]) return Object.assign({ key: own }, PALETTE[own]);
@@ -803,7 +838,7 @@
 
     const swatches = PALETTE_ORDER.map(function (k) {
       return '<button type="button" class="cp-dot' + (picked === k ? ' is-on' : '') + '" data-color="' + k + '" ' +
-        'style="--cb:' + PALETTE[k].bg + ';--cf:' + PALETTE[k].fg + '" aria-label="' + k + '"></button>';
+        'style="--cb:' + PALETTE[k].bg + ';--cf:' + PALETTE[k].fg + '" aria-label="' + (PALETTE_LABEL[k] || k) + '"></button>';
     }).join('');
 
     const body = '' +
@@ -820,9 +855,9 @@
       '<div class="field"><label>달력 막대 색 (선택)</label>' +
         '<div class="color-pick" id="color-pick">' +
           '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">기본</button>' +
-          swatches +
+          '<div class="cp-grid">' + swatches + '</div>' +
         '</div>' +
-        '<div class="helper">생리·아이 일정은 초록색, 그 외는 기본 베이지색으로 표시되고 원할 때만 바꿀 수 있어요.</div>' +
+        '<div class="helper">생리·아이는 초록, 카드 납부·이자 같은 정해진 납부·이체는 보라, 그 외는 기본 베이지로 표시돼요. 색은 연한 톤·진한 톤 중에 고를 수 있어요.</div>' +
       '</div>' +
       '<div class="field"><button type="button" class="pin-toggle ' + (star ? 'is-on' : '') + '" id="star-toggle">' +
         '<span class="sw"></span>중요하게 표시 (★)</button></div>';
