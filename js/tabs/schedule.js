@@ -35,7 +35,8 @@
   /* ---------- 달력 막대 색 ---------- */
   // 따로 고른 색이 없으면 제목으로 다섯 가지만 나눕니다.
   //   · 생일·생신 → 노랑
-  //   · 생리(월경) 일정, 아이(종원) 일정 → 초록
+  //   · 생리(월경) 일정 → 짙은 초록(진한 톤)
+  //   · 아이(종원) 일정 → 연한 초록
   //   · 병원·검진·치과·한의원 같은 개인 예약 → 주황
   //   · 카드 납부·이자·자동이체처럼 정해진 납부·이체 → 보라
   //   · 그 밖의 모든 일정 → 기본 베이지
@@ -71,7 +72,8 @@
     'rose_deep', 'coral_deep', 'blue_deep', 'green_deep', 'purple_deep', 'teal_deep', 'gold_deep', 'gray_deep'
   ];
   const DEFAULT_COLOR = 'gray';   // 그 외 일정 → 따뜻한 베이지 톤(#DDD6D0)
-  const AUTO_COLOR = 'green';     // 생리·아이 일정
+  const PERIOD_COLOR = 'green_deep'; // 생리·월경 일정 → 짙은 초록(#1B6E3C 바탕 · 흰 글자)
+  const CHILD_COLOR = 'green';    // 아이(종원) 일정 → 연한 초록(#A3F0C0 바탕 · 진한 초록 글자)
   const BIRTH_COLOR = 'gold';     // 생일·생신
   const HOSP_COLOR = 'coral';     // 병원·검진·치과 같은 개인 예약
   const PAY_COLOR = 'purple';     // 카드 납부·이자 등 정해진 납부·이체
@@ -107,11 +109,12 @@
     // '화이자'는 '이자'로 잘못 읽히지 않도록 지우고 봅니다.
     const t = String((it && it.text) || '').replace(/화이자/g, ' ');
     if (BIRTH_RE.test(t)) return BIRTH_COLOR;                                        // ① 생일·생신
-    if (PERIOD_RE.test(t) || CHILD_RE.test(t)) return AUTO_COLOR;                    // ② 생리·아이
-    if (MED_RE.test(t)) return HOSP_COLOR;                                          // ③ 병원·검진
-    if (PAY_STRONG_RE.test(t) && !PAY_SKIP_RE.test(t)) return PAY_COLOR;             // ④ 납부·이체
+    if (PERIOD_RE.test(t)) return PERIOD_COLOR;                                      // ② 생리·월경 → 짙은 초록
+    if (CHILD_RE.test(t)) return CHILD_COLOR;                                        // ③ 아이 일정 → 연한 초록
+    if (MED_RE.test(t)) return HOSP_COLOR;                                          // ④ 병원·검진
+    if (PAY_STRONG_RE.test(t) && !PAY_SKIP_RE.test(t)) return PAY_COLOR;             // ⑤ 납부·이체
     if (PAY_WEAK_RE.test(t) && !NOT_PAY_RE.test(t)) return PAY_COLOR;
-    return DEFAULT_COLOR;                                                            // ⑤ 그 외
+    return DEFAULT_COLOR;                                                            // ⑥ 그 외
   }
 
   function hexFg(hex) {
@@ -123,7 +126,7 @@
     return L > 0.62 ? '#3B3026' : '#FFFFFF';
   }
 
-  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생일은 노랑, 생리·아이는 초록, 병원은 주황, 납부·이체는 보라, 나머지는 베이지
+  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생일은 노랑, 생리는 짙은 초록, 아이는 연한 초록, 병원은 주황, 납부·이체는 보라, 나머지는 베이지
   function colorOf(it) {
     const own = it && it.color ? String(it.color) : '';
     if (own && PALETTE[own]) return Object.assign({ key: own }, PALETTE[own]);
@@ -871,7 +874,7 @@
           '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">기본</button>' +
           '<div class="cp-grid">' + swatches + '</div>' +
         '</div>' +
-        '<div class="helper">생일·생신은 노랑, 생리·아이는 초록, 병원·검진·치과는 주황, 카드 납부·이자 같은 납부·이체는 보라, 그 외는 기본 베이지로 표시돼요. 색은 연한 톤·진한 톤 중에 고를 수 있어요.</div>' +
+        '<div class="helper">생일은 노랑, 생리는 진한 초록, 아이는 연한 초록, 병원·치과는 주황, 납부·이체는 보라, 그 외는 기본 베이지로 표시돼요. 색은 연한 톤·진한 톤 중에 고를 수 있어요.</div>' +
       '</div>' +
       '<div class="field"><button type="button" class="pin-toggle ' + (star ? 'is-on' : '') + '" id="star-toggle">' +
         '<span class="sw"></span>중요하게 표시 (★)</button></div>';
