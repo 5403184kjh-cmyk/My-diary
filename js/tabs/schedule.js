@@ -33,8 +33,10 @@
   let lastWidth = window.innerWidth;  // 마지막으로 확인한 창 너비
 
   /* ---------- 달력 막대 색 ---------- */
-  // 따로 고른 색이 없으면 모두 같은 기본색(파랑)으로 보여 줍니다.
-  // 색은 사용자가 할 일 수정 창에서 직접 고를 때만 달라집니다.
+  // 따로 고른 색이 없으면 제목으로 두 가지만 나눕니다.
+  //   · 생리(월경) 일정, 아이(종원) 일정 → 초록
+  //   · 그 밖의 모든 일정 → 기본 파랑
+  // 사용자가 수정 창에서 색을 직접 고르면 그 색이 늘 우선입니다.
   const PALETTE = {
     rose:   { bg: '#FEAAC1', fg: '#7A0522' },
     coral:  { bg: '#FDC2AA', fg: '#7C2303' },
@@ -47,6 +49,21 @@
   };
   const PALETTE_ORDER = ['rose', 'coral', 'blue', 'green', 'purple', 'teal', 'gold', 'gray'];
   const DEFAULT_COLOR = 'blue';
+  const AUTO_COLOR = 'green';   // 생리·아이 일정에 쓰는 색
+
+  // 제목에서 찾는 낱말 — 실제 구글 캘린더 기록(2017~2028)에서 쓰신 표기를 기준으로 골랐습니다.
+  //   생리: 생리 · 생리시작 · 생리통 · 월경 · PMS
+  //   아이: 종원(종원이) · 아들 · 학교 · 휴교 · 방학 · 개학 · 급식 · 학부모 · 성교육 · WCA · 큐브 · 대회
+  // '아이'와 '교정'은 낱말로 쓰였을 때만 봅니다.
+  // (아이폰·미래아이·더모아이후·문법교정 같은 말에 잘못 걸리지 않게)
+  const PERIOD_RE = /(생리|월경|PMS)/i;
+  const CHILD_RE = /(종원|아들|학교|휴교|방학|개학|급식|학부모|성교육|WCA|큐브|대회)|(^|[^가-힣])아이([^가-힣]|$)|(^|[^가-힣])교정/i;
+
+  function autoColorKey(it) {
+    const t = String((it && it.text) || '') + ' ' + String((it && it.memo) || '');
+    if (PERIOD_RE.test(t) || CHILD_RE.test(t)) return AUTO_COLOR;
+    return DEFAULT_COLOR;
+  }
 
   function hexFg(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
@@ -57,12 +74,13 @@
     return L > 0.62 ? '#3B3026' : '#FFFFFF';
   }
 
-  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 늘 기본색
+  // 일정 하나의 색 { bg, fg, key } — 직접 고른 색이 없으면 생리·아이는 초록, 나머지는 기본 파랑
   function colorOf(it) {
     const own = it && it.color ? String(it.color) : '';
     if (own && PALETTE[own]) return Object.assign({ key: own }, PALETTE[own]);
     if (/^#[0-9a-f]{6}$/i.test(own)) return { key: 'custom', bg: own, fg: hexFg(own) };
-    return Object.assign({ key: DEFAULT_COLOR }, PALETTE[DEFAULT_COLOR]);
+    const k = autoColorKey(it);
+    return Object.assign({ key: k }, PALETTE[k]);
   }
 
   function colorVars(it) {
@@ -804,7 +822,7 @@
           '<button type="button" class="cp-auto' + (picked ? '' : ' is-on') + '" data-color="" style="--cb:' + autoColor.bg + ';--cf:' + autoColor.fg + '">기본</button>' +
           swatches +
         '</div>' +
-        '<div class="helper">그냥 두면 기본색으로 표시되고, 원할 때만 색을 골라 바꿀 수 있어요.</div>' +
+        '<div class="helper">생리·아이 일정은 초록색, 그 외는 기본 파란색으로 표시되고 원할 때만 바꿀 수 있어요.</div>' +
       '</div>' +
       '<div class="field"><button type="button" class="pin-toggle ' + (star ? 'is-on' : '') + '" id="star-toggle">' +
         '<span class="sw"></span>중요하게 표시 (★)</button></div>';
